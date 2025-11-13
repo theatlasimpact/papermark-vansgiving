@@ -9,6 +9,10 @@ export const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
+const BRAND_NAME = "Vansgiving Sponsor Deck";
+const FROM_DEFAULT = `${BRAND_NAME} <hello@joinvansgiving.com>`;
+const FROM_LOGIN = `${BRAND_NAME} <login@joinvansgiving.com>`;
+
 export const sendEmail = async ({
   to,
   subject,
@@ -47,21 +51,21 @@ export const sendEmail = async ({
   const fromAddress =
     from ??
     (marketing
-      ? "Marc from Papermark <marc@ship.papermark.io>"
+      ? FROM_DEFAULT
       : system
-        ? "Papermark <system@papermark.io>"
+        ? FROM_LOGIN
         : verify
-          ? "Papermark <system@verify.papermark.io>"
+          ? FROM_LOGIN
           : !!scheduledAt
-            ? "Marc Seitz <marc@papermark.io>"
-            : "Marc from Papermark <marc@papermark.io>");
+            ? FROM_DEFAULT
+            : FROM_DEFAULT);
 
   try {
     const { data, error } = await resend.emails.send({
       from: fromAddress,
       to: test ? "delivered@resend.dev" : to,
-      cc: cc,
-      replyTo: marketing ? "marc@papermark.io" : replyTo,
+      cc,
+      replyTo: marketing ? "hello@joinvansgiving.com" : replyTo,
       subject,
       react,
       scheduledAt,
@@ -72,7 +76,6 @@ export const sendEmail = async ({
       },
     });
 
-    // Check if the email sending operation returned an error and throw it
     if (error) {
       log({
         message: `Resend returned error when sending email: ${error.name} \n\n ${error.message}`,
@@ -82,15 +85,13 @@ export const sendEmail = async ({
       throw error;
     }
 
-    // If there's no error, return the data
     return data;
   } catch (exception) {
-    // Log and rethrow any caught exceptions for upstream handling
     log({
       message: `Unexpected error when sending email: ${exception}`,
       type: "error",
       mention: true,
     });
-    throw exception; // Rethrow the caught exception
+    throw exception;
   }
 };
