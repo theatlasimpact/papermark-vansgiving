@@ -15,15 +15,10 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        // Simple root redirect, no host condition to avoid build issues
         source: "/",
         destination: "/dashboard",
         permanent: false,
-        has: [
-          {
-            type: "host",
-            value: process.env.NEXT_PUBLIC_APP_BASE_HOST,
-          },
-        ],
       },
       {
         // temporary redirect set on 2025-10-22
@@ -113,13 +108,8 @@ const nextConfig = {
         ],
       },
       {
+        // Removed `has` with type "host" to avoid invalid config when env is missing
         source: "/services/:path*",
-        has: [
-          {
-            type: "host",
-            value: process.env.NEXT_PUBLIC_WEBHOOK_BASE_HOST,
-          },
-        ],
         headers: [
           {
             key: "X-Robots-Tag",
