@@ -45,8 +45,8 @@ export const sendEmail = async ({
   const fromAddress =
     from ??
     (marketing
-      ? 'Vansgiving <hello@joinvansgiving.com>'
-      : 'Vansgiving <login@joinvansgiving.com>');
+      ? "Vansgiving <hello@joinvansgiving.com>"
+      : "Vansgiving <login@joinvansgiving.com>");
 
   try {
     const { data, error } = await resend.emails.send({
@@ -85,9 +85,9 @@ export const sendEmail = async ({
 };
 
 export async function sendVerificationRequest(
-  params: SendVerificationRequestParams
+  params: SendVerificationRequestParams,
 ) {
-  const { identifier, url, provider } = params;
+  const { identifier, url } = params;
 
   if (!process.env.RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is not set");
@@ -95,12 +95,9 @@ export async function sendVerificationRequest(
 
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const fromAddress =
-    (provider && (provider as any).from) ||
-    "Vansgiving Sponsor Deck <login@joinvansgiving.com>";
-
-  const replyToAddress =
-    (provider && (provider as any).replyTo) || "hello@joinvansgiving.com";
+  // Force a verified Vansgiving sender for login links
+  const fromAddress = "Vansgiving Sponsor Deck <login@joinvansgiving.com>";
+  const replyToAddress = "hello@joinvansgiving.com";
 
   const loginUrl = url;
   const host = new URL(loginUrl).host;
