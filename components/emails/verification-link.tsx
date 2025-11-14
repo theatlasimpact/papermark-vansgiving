@@ -2,7 +2,6 @@ import React from "react";
 
 import {
   Body,
-  Button,
   Container,
   Head,
   Html,
@@ -37,19 +36,18 @@ const VerificationLinkEmail = ({
               Please click the magic link below to sign in to your account.
             </Text>
             <Section className="my-8 text-center">
-              <Button
-                className="rounded bg-black text-center text-xs font-semibold text-white no-underline"
+              <a
+                className="rounded bg-black px-5 py-3 text-center text-xs font-semibold text-white no-underline"
                 href={url}
-                style={{ padding: "12px 20px" }}
               >
                 Sign in
-              </Button>
+              </a>
             </Section>
             <Text className="text-sm leading-6 text-black">
               or copy and paste this URL into your browser:
             </Text>
             <Text className="max-w-sm flex-wrap break-words font-medium text-purple-600 no-underline">
-              {url.replace(/^https?:\/\//, "")}
+              {url}
             </Text>
             <Footer />
           </Container>

@@ -1,17 +1,11 @@
 import { JSXElementConstructor, ReactElement } from "react";
-
 import { render, toPlainText } from "@react-email/render";
 import { Resend } from "resend";
-
 import { log, nanoid } from "@/lib/utils";
 
 export const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
-
-const BRAND_NAME = "Vansgiving Sponsor Deck";
-const FROM_DEFAULT = `${BRAND_NAME} <hello@joinvansgiving.com>`;
-const FROM_LOGIN = `${BRAND_NAME} <login@joinvansgiving.com>`;
 
 export const sendEmail = async ({
   to,
@@ -41,7 +35,6 @@ export const sendEmail = async ({
   unsubscribeUrl?: string;
 }) => {
   if (!resend) {
-    // Throw an error if resend is not initialized
     throw new Error("Resend not initialized");
   }
 
@@ -51,21 +44,15 @@ export const sendEmail = async ({
   const fromAddress =
     from ??
     (marketing
-      ? FROM_DEFAULT
-      : system
-        ? FROM_LOGIN
-        : verify
-          ? FROM_LOGIN
-          : !!scheduledAt
-            ? FROM_DEFAULT
-            : FROM_DEFAULT);
+      ? 'Vansgiving <hello@joinvansgiving.com>'
+      : 'Vansgiving <login@joinvansgiving.com>');
 
   try {
     const { data, error } = await resend.emails.send({
       from: fromAddress,
       to: test ? "delivered@resend.dev" : to,
       cc,
-      replyTo: marketing ? "hello@joinvansgiving.com" : replyTo,
+      replyTo: replyTo ?? "hello@joinvansgiving.com",
       subject,
       react,
       scheduledAt,
@@ -78,7 +65,7 @@ export const sendEmail = async ({
 
     if (error) {
       log({
-        message: `Resend returned error when sending email: ${error.name} \n\n ${error.message}`,
+        message: `Resend returned error: ${error.name}\n${error.message}`,
         type: "error",
         mention: true,
       });
