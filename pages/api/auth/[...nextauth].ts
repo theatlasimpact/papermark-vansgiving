@@ -12,6 +12,7 @@ import { identifyUser, trackAnalytics } from "@/lib/analytics";
 import { dub } from "@/lib/dub";
 import { isBlacklistedEmail } from "@/lib/edge-config/blacklist";
 import { sendWelcomeEmail } from "@/lib/emails/send-welcome";
+import { sendVerificationRequest } from "@/lib/resend";
 import hanko from "@/lib/hanko";
 import prisma from "@/lib/prisma";
 import { CreateUserEmailProps, CustomUser } from "@/lib/types";
@@ -57,18 +58,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     EmailProvider({
-      async sendVerificationRequest({ identifier, url }) {
-        const { sendEmail } = require("@/lib/resend");
-        const LoginLink =
-          require("@/components/emails/verification-link").default;
-
-        await sendEmail({
-          to: identifier,
-          subject: "Your Papermark Login Link",
-          react: LoginLink({ url }),
-          system: true,
-        });
-      },
+      sendVerificationRequest,
     }),
     PasskeyProvider({
       tenant: hanko,
