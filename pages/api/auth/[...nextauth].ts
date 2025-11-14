@@ -58,6 +58,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     EmailProvider({
+      from: "Vansgiving Sponsor Deck <login@joinvansgiving.com>",
       sendVerificationRequest,
     }),
     PasskeyProvider({
@@ -78,8 +79,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        // When working on localhost, the cookie domain must be omitted entirely (https://stackoverflow.com/a/1188145)
-        domain: VERCEL_DEPLOYMENT ? ".papermark.com" : undefined,
+        // Do not set a fixed domain so cookies work on preview URLs and the final custom domain
         secure: VERCEL_DEPLOYMENT,
       },
     },
