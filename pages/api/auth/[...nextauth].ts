@@ -11,24 +11,15 @@ import LinkedInProvider from "next-auth/providers/linkedin";
 import { identifyUser, trackAnalytics } from "@/lib/analytics";
 import { dub } from "@/lib/dub";
 import { isBlacklistedEmail } from "@/lib/edge-config/blacklist";
-import { sendVerificationRequestEmail } from "@/lib/emails/send-verification-request";
 import { sendWelcomeEmail } from "@/lib/emails/send-welcome";
 import hanko from "@/lib/hanko";
 import prisma from "@/lib/prisma";
 import { CreateUserEmailProps, CustomUser } from "@/lib/types";
 import { subscribe } from "@/lib/unsend";
 import { log } from "@/lib/utils";
-import { generateChecksum } from "@/lib/utils/generate-checksum";
 import { getIpAddress } from "@/lib/utils/ip";
 
 const VERCEL_DEPLOYMENT = !!process.env.VERCEL_URL;
-
-function getMainDomainUrl(): string {
-  if (process.env.NODE_ENV === "development") {
-    return process.env.NEXTAUTH_URL || "http://localhost:3000";
-  }
-  return process.env.NEXTAUTH_URL || "https://app.papermark.com";
-}
 
 // This function can run for a maximum of 180 seconds
 export const config = {
@@ -67,40 +58,16 @@ export const authOptions: NextAuthOptions = {
     }),
     EmailProvider({
       async sendVerificationRequest({ identifier, url }) {
-        const hasValidNextAuthUrl = !!process.env.NEXTAUTH_URL;
-        let finalUrl = url;
+        const { sendEmail } = require("@/lib/resend");
+        const LoginLink =
+          require("@/components/emails/verification-link").default;
 
-        if (!hasValidNextAuthUrl) {
-          const mainDomainUrl = getMainDomainUrl();
-          const urlObj = new URL(url);
-          const mainDomainObj = new URL(mainDomainUrl);
-          urlObj.hostname = mainDomainObj.hostname;
-          urlObj.protocol = mainDomainObj.protocol;
-          urlObj.port = mainDomainObj.port || "";
-
-          finalUrl = urlObj.toString();
-        }
-
-        if (process.env.NODE_ENV === "development") {
-          const checksum = generateChecksum(finalUrl);
-          const verificationUrlParams = new URLSearchParams({
-            verification_url: finalUrl,
-            checksum,
-          });
-
-          const baseUrl = hasValidNextAuthUrl
-            ? process.env.NEXTAUTH_URL
-            : getMainDomainUrl();
-
-          const verificationUrl = `${baseUrl}/verify?${verificationUrlParams}`;
-          console.log("[Login URL]", verificationUrl);
-          return;
-        } else {
-          await sendVerificationRequestEmail({
-            url: finalUrl,
-            email: identifier,
-          });
-        }
+        await sendEmail({
+          to: identifier,
+          subject: "Your Papermark Login Link",
+          react: LoginLink({ url }),
+          system: true,
+        });
       },
     }),
     PasskeyProvider({
