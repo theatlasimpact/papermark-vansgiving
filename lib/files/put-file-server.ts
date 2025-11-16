@@ -6,6 +6,7 @@ import path from "node:path";
 import { match } from "ts-pattern";
 
 import { newId } from "@/lib/id-helper";
+import { getUploadTransport } from "./upload-transport";
 
 import { SUPPORTED_DOCUMENT_MIME_TYPES } from "../constants";
 import { getTeamS3ClientAndConfig } from "./aws-client";
@@ -28,9 +29,9 @@ export const putFileServer = async ({
   docId?: string;
   restricted?: boolean;
 }) => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
+  const uploadTransport = getUploadTransport();
 
-  const { type, data } = await match(NEXT_PUBLIC_UPLOAD_TRANSPORT)
+  const { type, data } = await match(uploadTransport)
     .with("s3", async () =>
       putFileInS3Server({ file, teamId, docId, restricted }),
     )

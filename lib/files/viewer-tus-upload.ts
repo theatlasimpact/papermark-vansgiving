@@ -1,6 +1,7 @@
 import * as tus from "tus-js-client";
 
 import { decodeBase64Url } from "../utils/decode-base64url";
+import { isS3UploadTransport } from "./upload-transport";
 
 type ViewerUploadParams = {
   file: File;
@@ -35,6 +36,10 @@ export function viewerUpload({
   teamId,
   numPages,
 }: ViewerUploadParams) {
+  if (!isS3UploadTransport()) {
+    throw new Error("Viewer uploads via TUS are disabled on this deployment.");
+  }
+
   return new Promise<{ upload: tus.Upload; complete: Promise<UploadResult> }>(
     (resolve, reject) => {
       let completeResolve: (

@@ -1,6 +1,7 @@
 import * as tus from "tus-js-client";
 
 import { decodeBase64Url } from "../utils/decode-base64url";
+import { isS3UploadTransport } from "./upload-transport";
 
 type ResumableUploadParams = {
   file: File;
@@ -32,6 +33,10 @@ export function resumableUpload({
   numPages,
   relativePath,
 }: ResumableUploadParams) {
+  if (!isS3UploadTransport()) {
+    throw new Error("S3/TUS uploads are disabled on this deployment.");
+  }
+
   return new Promise<{ upload: tus.Upload; complete: Promise<UploadResult> }>(
     (resolve, reject) => {
       let completeResolve: (

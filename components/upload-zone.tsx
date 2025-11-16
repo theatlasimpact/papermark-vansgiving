@@ -17,6 +17,8 @@ import {
 } from "@/lib/constants";
 import { DocumentData, createDocument } from "@/lib/documents/create-document";
 import { resumableUpload } from "@/lib/files/tus-upload";
+import { putFile } from "@/lib/files/put-file";
+import { getUploadTransport } from "@/lib/files/upload-transport";
 import {
   createFolderInBoth,
   createFolderInMainDocs,
@@ -41,6 +43,8 @@ import { getPagesCount } from "@/lib/utils/get-page-number-count";
 const acceptableDropZoneMimeTypesWhenIsFreePlanAndNotTrial =
   FREE_PLAN_ACCEPTED_FILE_TYPES;
 const allAcceptableDropZoneMimeTypes = FULL_PLAN_ACCEPTED_FILE_TYPES;
+const uploadTransport = getUploadTransport();
+const isS3UploadsEnabled = uploadTransport === "s3";
 
 interface FileWithPaths extends File {
   path?: string;
@@ -321,28 +325,83 @@ export default function UploadZone({
           }
         }
 
-        const { complete } = await resumableUpload({
-          file, // File
-          onProgress: (bytesUploaded, bytesTotal) => {
-            const progress = Math.min(
-              Math.round((bytesUploaded / bytesTotal) * 100),
-              99,
-            );
-            setUploads((prevUploads) => {
-              const updatedUploads = prevUploads.map((upload) =>
-                upload.uploadId === newUploads[index].uploadId
-                  ? { ...upload, progress }
-                  : upload,
+        let storageKey: string;
+        let storageType: DocumentStorageType;
+        let resolvedContentType = file.type;
+        let referenceFileName = file.name;
+        let uploadedNumPages = numPages;
+
+        if (isS3UploadsEnabled) {
+          const { complete } = await resumableUpload({
+            file, // File
+            onProgress: (bytesUploaded, bytesTotal) => {
+              const progress = Math.min(
+                Math.round((bytesUploaded / bytesTotal) * 100),
+                99,
               );
-              const currentUpload = updatedUploads.find(
-                (upload) => upload.uploadId === newUploads[index].uploadId,
+              setUploads((prevUploads) => {
+                const updatedUploads = prevUploads.map((upload) =>
+                  upload.uploadId === newUploads[index].uploadId
+                    ? { ...upload, progress }
+                    : upload,
+                );
+                const currentUpload = updatedUploads.find(
+                  (upload) => upload.uploadId === newUploads[index].uploadId,
+                );
+
+                onUploadProgress(index, progress, currentUpload?.documentId);
+                return updatedUploads;
+              });
+            },
+            onError: (error) => {
+              setUploads((prev) =>
+                prev.filter(
+                  (upload) => upload.uploadId !== newUploads[index].uploadId,
+                ),
               );
 
-              onUploadProgress(index, progress, currentUpload?.documentId);
-              return updatedUploads;
+              setRejectedFiles((prev) => [
+                { fileName: file.name, message: "Error uploading file" },
+                ...prev,
+              ]);
+            },
+            ownerId: (session?.user as CustomUser).id,
+            teamId: teamInfo?.currentTeam?.id as string,
+            numPages,
+            relativePath: path.substring(0, path.lastIndexOf("/")),
+          });
+
+          const uploadResult = await complete;
+          resolvedContentType = uploadResult.fileType;
+          referenceFileName = uploadResult.fileName;
+          storageKey = uploadResult.id;
+          storageType = DocumentStorageType.S3_PATH;
+          uploadedNumPages = uploadResult.numPages;
+        } else {
+          try {
+            const uploadResult = await putFile({
+              file,
+              teamId: teamInfo?.currentTeam?.id as string,
             });
-          },
-          onError: (error) => {
+
+            if (!uploadResult.type || !uploadResult.data) {
+              throw new Error("Invalid upload transport result");
+            }
+
+            storageKey = uploadResult.data;
+            storageType = uploadResult.type;
+            uploadedNumPages = uploadResult.numPages ?? numPages;
+            resolvedContentType = file.type;
+
+            setUploads((prevUploads) =>
+              prevUploads.map((upload) =>
+                upload.uploadId === newUploads[index].uploadId
+                  ? { ...upload, progress: 99 }
+                  : upload,
+              ),
+            );
+            onUploadProgress(index, 99);
+          } catch (error) {
             setUploads((prev) =>
               prev.filter(
                 (upload) => upload.uploadId !== newUploads[index].uploadId,
@@ -353,44 +412,39 @@ export default function UploadZone({
               { fileName: file.name, message: "Error uploading file" },
               ...prev,
             ]);
-          },
-          ownerId: (session?.user as CustomUser).id,
-          teamId: teamInfo?.currentTeam?.id as string,
-          numPages,
-          relativePath: path.substring(0, path.lastIndexOf("/")),
-        });
+            throw error;
+          }
+        }
 
-        const uploadResult = await complete;
-
-        let contentType = uploadResult.fileType;
+        let contentType = resolvedContentType;
         let supportedFileType = getSupportedContentType(contentType) ?? "";
 
         if (
-          uploadResult.fileName.endsWith(".dwg") ||
-          uploadResult.fileName.endsWith(".dxf")
+          referenceFileName.endsWith(".dwg") ||
+          referenceFileName.endsWith(".dxf")
         ) {
           supportedFileType = "cad";
-          contentType = `image/vnd.${uploadResult.fileName.split(".").pop()}`;
+          contentType = `image/vnd.${referenceFileName.split(".").pop()}`;
         }
 
-        if (uploadResult.fileName.endsWith(".xlsm")) {
+        if (referenceFileName.endsWith(".xlsm")) {
           supportedFileType = "sheet";
           contentType = "application/vnd.ms-excel.sheet.macroEnabled.12";
         }
 
         if (
-          uploadResult.fileName.endsWith(".kml") ||
-          uploadResult.fileName.endsWith(".kmz")
+          referenceFileName.endsWith(".kml") ||
+          referenceFileName.endsWith(".kmz")
         ) {
           supportedFileType = "map";
-          contentType = `application/vnd.google-earth.${uploadResult.fileName.endsWith(".kml") ? "kml+xml" : "kmz"}`;
+          contentType = `application/vnd.google-earth.${referenceFileName.endsWith(".kml") ? "kml+xml" : "kmz"}`;
         }
 
         const documentData: DocumentData = {
-          key: uploadResult.id,
+          key: storageKey,
           supportedFileType: supportedFileType,
           name: file.name,
-          storageType: DocumentStorageType.S3_PATH,
+          storageType: storageType,
           contentType: contentType,
           fileSize: file.size,
         };
@@ -401,7 +455,7 @@ export default function UploadZone({
         const response = await createDocument({
           documentData,
           teamId: teamInfo?.currentTeam?.id as string,
-          numPages: uploadResult.numPages,
+          numPages: uploadedNumPages,
           folderPathName: fileUploadPathName,
         });
 

@@ -5,12 +5,11 @@ import {
 } from "@/ee/features/storage/config";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { S3Client } from "@aws-sdk/client-s3";
+import { isS3UploadTransport } from "./upload-transport";
 
 export const getS3Client = (storageRegion?: string) => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
-
-  if (NEXT_PUBLIC_UPLOAD_TRANSPORT !== "s3") {
-    throw new Error("Invalid upload transport");
+  if (!isS3UploadTransport()) {
+    throw new Error("S3 upload transport is disabled on this deployment.");
   }
 
   const config = getStorageConfig(storageRegion);
@@ -26,10 +25,8 @@ export const getS3Client = (storageRegion?: string) => {
 };
 
 export const getS3ClientForTeam = async (teamId: string) => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
-
-  if (NEXT_PUBLIC_UPLOAD_TRANSPORT !== "s3") {
-    throw new Error("Invalid upload transport");
+  if (!isS3UploadTransport()) {
+    throw new Error("S3 upload transport is disabled on this deployment.");
   }
 
   const config = await getTeamStorageConfigById(teamId);
@@ -45,10 +42,8 @@ export const getS3ClientForTeam = async (teamId: string) => {
 };
 
 export const getLambdaClient = (storageRegion?: string) => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
-
-  if (NEXT_PUBLIC_UPLOAD_TRANSPORT !== "s3") {
-    throw new Error("Invalid upload transport");
+  if (!isS3UploadTransport()) {
+    throw new Error("S3 upload transport is disabled on this deployment.");
   }
 
   const config = getStorageConfig(storageRegion);
@@ -63,10 +58,8 @@ export const getLambdaClient = (storageRegion?: string) => {
 };
 
 export const getLambdaClientForTeam = async (teamId: string) => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
-
-  if (NEXT_PUBLIC_UPLOAD_TRANSPORT !== "s3") {
-    throw new Error("Invalid upload transport");
+  if (!isS3UploadTransport()) {
+    throw new Error("S3 upload transport is disabled on this deployment.");
   }
 
   const config = await getTeamStorageConfigById(teamId);
@@ -88,10 +81,8 @@ export const getLambdaClientForTeam = async (teamId: string) => {
  * @returns Promise<{ client: S3Client, config: StorageConfig }> - Both client and config
  */
 export const getTeamS3ClientAndConfig = async (teamId: string) => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
-
-  if (NEXT_PUBLIC_UPLOAD_TRANSPORT !== "s3") {
-    throw new Error("Invalid upload transport");
+  if (!isS3UploadTransport()) {
+    throw new Error("S3 upload transport is disabled on this deployment.");
   }
 
   const config = await getTeamStorageConfigById(teamId);
