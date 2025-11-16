@@ -3,6 +3,7 @@ import { upload } from "@vercel/blob/client";
 import { match } from "ts-pattern";
 
 import { newId } from "@/lib/id-helper";
+import { getUploadTransport } from "./upload-transport";
 import { getPagesCount } from "@/lib/utils/get-page-number-count";
 import type {
   MultipartCompleteRequest,
@@ -40,11 +41,9 @@ export const putFile = async ({
   numPages: number | undefined;
   fileSize: number | undefined;
 }> => {
-  const NEXT_PUBLIC_UPLOAD_TRANSPORT = process.env.NEXT_PUBLIC_UPLOAD_TRANSPORT;
+  const uploadTransport = getUploadTransport();
 
-  const { type, data, numPages, fileSize } = await match(
-    NEXT_PUBLIC_UPLOAD_TRANSPORT,
-  )
+  const { type, data, numPages, fileSize } = await match(uploadTransport)
     .with("s3", async () => putFileInS3({ file, teamId, docId }))
     .with("vercel", async () => putFileInVercel(file))
     .otherwise(() => {

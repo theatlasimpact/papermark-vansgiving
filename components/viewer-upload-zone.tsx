@@ -5,6 +5,7 @@ import { FileRejection, useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 
 import { VIEWER_ACCEPTED_FILE_TYPES } from "@/lib/constants";
+import { isS3UploadTransport } from "@/lib/files/upload-transport";
 import { DocumentData } from "@/lib/documents/create-document";
 import { viewerUpload } from "@/lib/files/viewer-tus-upload";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import { getPagesCount } from "@/lib/utils/get-page-number-count";
 
 // File types allowed for viewer uploads
 const acceptableViewerFileTypes = VIEWER_ACCEPTED_FILE_TYPES;
+const isS3UploadsEnabled = isS3UploadTransport();
 
 export default function ViewerUploadZone({
   children,
@@ -58,6 +60,11 @@ export default function ViewerUploadZone({
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
+      if (!isS3UploadsEnabled) {
+        toast.error("Viewer uploads are disabled on this deployment.");
+        return;
+      }
+
       const newUploads = acceptedFiles.map((file) => ({
         fileName: file.name,
         progress: 0,

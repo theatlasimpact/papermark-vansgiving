@@ -1,4 +1,5 @@
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { isS3UploadTransport } from "@/lib/files/upload-transport";
 
 export interface StorageConfig {
   bucket: string;
@@ -24,6 +25,13 @@ export type StorageRegion = "eu-central-1" | "us-east-2";
  * @returns StorageConfig object with all necessary AWS configuration
  */
 export function getStorageConfig(storageRegion?: string): StorageConfig {
+  if (!isS3UploadTransport()) {
+    // S3-specific environment variables are only required when uploads use S3.
+    throw new Error(
+      'S3 upload transport is disabled. Set NEXT_PUBLIC_UPLOAD_TRANSPORT="s3" to use S3 uploads.'
+    );
+  }
+
   const isUS = storageRegion === "us-east-2";
   const suffix = isUS ? "_US" : "";
 
