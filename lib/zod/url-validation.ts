@@ -11,6 +11,25 @@ import {
 } from "@/lib/notion/utils";
 import { getSupportedContentType } from "@/lib/utils/get-content-type";
 
+const matchesVercelBlobHostname = (hostname: string): boolean => {
+  const normalizedHostname = hostname.toLowerCase();
+  const envHost = process.env.VERCEL_BLOB_HOST?.toLowerCase();
+
+  if (envHost) {
+    if (
+      normalizedHostname === envHost ||
+      normalizedHostname.endsWith(`.${envHost}`) ||
+      normalizedHostname.startsWith(envHost)
+    ) {
+      return true;
+    }
+  }
+
+  return normalizedHostname.endsWith('.vercel-storage.com');
+};
+
+const FILE_STORAGE_PATH_PATTERN = /^[a-zA-Z0-9_-]+\/doc_[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+$/;
+
 /**
  * Validates basic security aspects of paths and URLs
  * Prevents directory traversal, null byte injection, and double encoding attacks
@@ -102,10 +121,7 @@ const createFilePathValidator = () => {
             const isValidNotionDomain = validNotionDomains.includes(hostname);
 
             // Check for vercel blob storage
-            let isVercelBlob = false;
-            if (process.env.VERCEL_BLOB_HOST) {
-              isVercelBlob = hostname.startsWith(process.env.VERCEL_BLOB_HOST);
-            }
+            const isVercelBlob = matchesVercelBlobHostname(hostname);
 
             // If it's not a standard Notion domain or Vercel blob, check if it's a custom Notion domain
             if (!isNotionSite && !isValidNotionDomain && !isVercelBlob) {
@@ -130,9 +146,7 @@ const createFilePathValidator = () => {
         }
 
         // Case 2: file storage paths - must match pattern: <id>/doc_<someId>/<name>.<ext>
-        const s3PathPattern =
-          /^[a-zA-Z0-9_-]+\/doc_[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+$/;
-        return s3PathPattern.test(path);
+        return FILE_STORAGE_PATH_PATTERN.test(path);
       },
       {
         message:
@@ -216,6 +230,9 @@ export const notionUrlUpdateSchema = z
   );
 
 // Document upload validation schema with comprehensive type and content validation
+// Non-Notion Vercel Blob uploads must send storageType="VERCEL_BLOB" and the HTTPS blob URL
+// returned by Vercel (matching the configured blob host). Legacy S3-style storage paths remain
+// accepted for migration/backfill scenarios.
 export const documentUploadSchema = z
   .object({
     name: z
@@ -315,9 +332,8 @@ export const documentUploadSchema = z
         // S3_PATH should use file paths, not URLs
         return !data.url.startsWith("https://");
       } else if (data.storageType === "VERCEL_BLOB") {
-        // VERCEL_BLOB can use either Notion URLs or S3 paths (for migration)
+        // VERCEL_BLOB can use either HTTPS blob URLs or S3-style paths (for migration)
         if (data.url.startsWith("https://")) {
-          // Must be a Notion URL for VERCEL_BLOB
           try {
             const urlObj = new URL(data.url);
             const hostname = urlObj.hostname;
@@ -325,8 +341,9 @@ export const documentUploadSchema = z
               hostname === "www.notion.so" ||
               hostname === "notion.so" ||
               hostname.endsWith(".notion.site");
+            const isVercelBlob = matchesVercelBlobHostname(hostname);
 
-            if (isStandardNotion) {
+            if (isVercelBlob || isStandardNotion) {
               return true;
             }
 
@@ -341,9 +358,7 @@ export const documentUploadSchema = z
           }
         }
         // Or an S3 path (allowed for migration)
-        return /^[a-zA-Z0-9_-]+\/doc_[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+$/.test(
-          data.url,
-        );
+        return FILE_STORAGE_PATH_PATTERN.test(data.url);
       }
       return false;
     },

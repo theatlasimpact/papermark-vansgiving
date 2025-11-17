@@ -46,6 +46,12 @@ const allAcceptableDropZoneMimeTypes = FULL_PLAN_ACCEPTED_FILE_TYPES;
 const uploadTransport = getUploadTransport();
 const isS3UploadsEnabled = uploadTransport === "s3";
 
+/**
+ * UploadZone toggles between resumable S3 uploads (TUS) and the browser-based Vercel Blob
+ * transport. S3 uploads post a key + DocumentStorageType.S3_PATH to the API while Blob uploads
+ * reuse the returned blob URL with DocumentStorageType.VERCEL_BLOB so the request body matches
+ * the server schema.
+ */
 interface FileWithPaths extends File {
   path?: string;
   whereToUploadPath?: string;
