@@ -1,10 +1,3 @@
 {
-  "functions": {
-    "pages/api/mupdf/convert-page.ts": {
-      "memory": 2048
-    },
-    "pages/api/mupdf/annotate-document.ts": {
-      "memory": 2048
-    }
-  }
+  "buildCommand": "npm run vercel-build"
 }
