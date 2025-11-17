@@ -142,9 +142,10 @@ export default async function handle(
       }
 
       const teamPlan = link.team?.plan || "free";
+      const isSelfHosted = process.env.SELF_HOSTED === "true";
       const teamId = link.teamId;
       // if owner of document is on free plan, return 404
-      if (teamPlan.includes("free")) {
+      if (teamPlan.includes("free") && !isSelfHosted) {
         log({
           message: `Link is from a free team _${teamId}_ for custom domain _${domain}/${slug}_`,
           type: "info",
@@ -210,7 +211,7 @@ export default async function handle(
         team: undefined,
         document: undefined,
         dataroom: undefined,
-        ...(teamPlan === "free" && {
+        ...(teamPlan === "free" && !isSelfHosted && {
           customFields: [], // reset custom fields for free plan
           enableAgreement: false,
           enableWatermark: false,
