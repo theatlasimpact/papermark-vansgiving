@@ -1,11 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
+const UNLIMITED = 1000000000; // effectively unlimited for self-hosted
+
 const UNLIMITED_LIMITS = {
-  datarooms: Infinity,
-  links: Infinity,
-  documents: Infinity,
-  users: Infinity,
-  domains: Infinity,
+  datarooms: UNLIMITED,
+  links: UNLIMITED,
+  documents: UNLIMITED,
+  users: UNLIMITED,
+  domains: UNLIMITED,
   customDomainOnPro: true,
   customDomainInDataroom: true,
   advancedLinkControlsOnPro: true,

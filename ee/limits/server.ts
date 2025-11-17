@@ -24,12 +24,14 @@ export const configSchema = z.object({
     .optional(),
 });
 
+const UNLIMITED = 1000000000; // effectively unlimited for self-hosted
+
 const unlimitedLimits = {
-  datarooms: Infinity,
-  links: Infinity,
-  documents: Infinity,
-  users: Infinity,
-  domains: Infinity,
+  datarooms: UNLIMITED,
+  links: UNLIMITED,
+  documents: UNLIMITED,
+  users: UNLIMITED,
+  domains: UNLIMITED,
   customDomainOnPro: true,
   customDomainInDataroom: true,
   advancedLinkControlsOnPro: true,
