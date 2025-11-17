@@ -129,7 +129,10 @@ export async function getTeamWithDomain({
   }
 
   // check if the team has a paid plan
-  const teamHasPaidPlan = team?.plan !== "free";
+  // In self-hosted mode we allow custom domains for all teams.
+  const isSelfHosted = process.env.SELF_HOSTED === "true";
+  const teamHasPaidPlan = isSelfHosted || team?.plan !== "free";
+
   if (!teamHasPaidPlan) {
     throw new TeamError("Team doesn't have a paid plan");
   }
