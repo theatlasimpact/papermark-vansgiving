@@ -1,15 +1,14 @@
-import { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 
-import { handleRoute } from "@/ee/features/billing/cancellation/api/pause-route";
-
-export const config = {
-  // in order to enable `waitUntil` function
-  supportsResponseStreaming: true,
+const BILLING_DISABLED_RESPONSE = {
+  ok: false,
+  message: "Billing disabled in self-hosted Vansgiving edition.",
 };
 
-export default async function handle(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  return handleRoute(req, res);
+  res.status(200).json(BILLING_DISABLED_RESPONSE);
 }
+
