@@ -50,9 +50,16 @@ export default function WatermarkConfigSheet({
     useState<Partial<WatermarkConfig>>(initialConfig);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  /**
+   * FIXED: Avoids wiping user input whenever initialConfig updates.
+   * Now it only resets the form when the panel is opened.
+   */
   useEffect(() => {
-    setFormValues(initialConfig);
-  }, [initialConfig]);
+    if (isOpen) {
+      setFormValues(initialConfig);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -174,11 +181,17 @@ export default function WatermarkConfigSheet({
                     <SelectItem value="top-center">Top Center</SelectItem>
                     <SelectItem value="top-right">Top Right</SelectItem>
                     <SelectItem value="middle-left">Middle Left</SelectItem>
-                    <SelectItem value="middle-center">Middle Center</SelectItem>
+                    <SelectItem value="middle-center">
+                      Middle Center
+                    </SelectItem>
                     <SelectItem value="middle-right">Middle Right</SelectItem>
                     <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                    <SelectItem value="bottom-center">Bottom Center</SelectItem>
-                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                    <SelectItem value="bottom-center">
+                      Bottom Center
+                    </SelectItem>
+                    <SelectItem value="bottom-right">
+                      Bottom Right
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.position && (
