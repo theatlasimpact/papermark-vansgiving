@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { teamHasPaidPlan } from "@/lib/plan/guards";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { serializeFileSize } from "@/lib/utils";
@@ -129,7 +130,7 @@ export default async function handle(
 
     // Check for page links only if needed
     let hasPageLinks = false;
-    if (primaryVersion && team.plan.includes("free")) {
+    if (primaryVersion && !teamHasPaidPlan(team?.plan)) {
       const pageLinksCount = await prisma.documentPage.count({
         where: {
           versionId: primaryVersion.id,

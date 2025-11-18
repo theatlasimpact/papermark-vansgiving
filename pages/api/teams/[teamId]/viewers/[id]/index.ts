@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
+import { teamHasFeature } from "@/lib/plan/guards";
 import { redis } from "@/lib/redis";
 import { getDocumentDurationPerViewer } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
@@ -105,7 +106,7 @@ export default async function handle(
         select: { id: true, plan: true },
       });
 
-      if (!team || team.plan === "free") {
+      if (!team || !teamHasFeature(team.plan, "viewerDirectory")) {
         return res.status(404).json({ message: "Team not found" });
       }
 

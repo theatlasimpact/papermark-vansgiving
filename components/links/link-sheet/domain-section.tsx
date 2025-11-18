@@ -45,13 +45,20 @@ export default function DomainSection({
   const teamInfo = useTeam();
   const { limits } = useLimits();
 
-  const { isBusiness, isDatarooms, isDataroomsPlus } = usePlan();
+  const { isBusiness, isDatarooms, isDataroomsPlus, isSelfHosted } = usePlan();
 
   // Check plan eligibility for custom domains
   const canUseCustomDomainForDocument =
-    isBusiness || isDatarooms || isDataroomsPlus || limits?.customDomainOnPro;
+    isSelfHosted ||
+    isBusiness ||
+    isDatarooms ||
+    isDataroomsPlus ||
+    limits?.customDomainOnPro;
   const canUseCustomDomainForDataroom =
-    isDatarooms || isDataroomsPlus || limits?.customDomainInDataroom;
+    isSelfHosted ||
+    isDatarooms ||
+    isDataroomsPlus ||
+    limits?.customDomainInDataroom;
 
   // Check if we're editing a link with a custom domain
   const isEditingCustomDomain =
@@ -80,8 +87,9 @@ export default function DomainSection({
     if (value !== "papermark.com") {
       // Show upgrade modal if user doesn't have the right plan
       if (
-        (linkType === "DOCUMENT_LINK" && !canUseCustomDomainForDocument) ||
-        (linkType === "DATAROOM_LINK" && !canUseCustomDomainForDataroom)
+        !isSelfHosted &&
+        ((linkType === "DOCUMENT_LINK" && !canUseCustomDomainForDocument) ||
+          (linkType === "DATAROOM_LINK" && !canUseCustomDomainForDataroom))
       ) {
         setUpgradeModalOpen(true);
         setData({ ...data, domain: "papermark.com" });
@@ -147,9 +155,11 @@ export default function DomainSection({
   const isDomainVerified = currentDomain?.verified;
 
   const isDisabled =
-    linkType === "DOCUMENT_LINK"
-      ? isEditingCustomDomain && !canUseCustomDomainForDocument
-      : isEditingCustomDomain && !canUseCustomDomainForDataroom;
+    isSelfHosted
+      ? false
+      : linkType === "DOCUMENT_LINK"
+        ? isEditingCustomDomain && !canUseCustomDomainForDocument
+        : isEditingCustomDomain && !canUseCustomDomainForDataroom;
 
   return (
     <>
@@ -281,7 +291,7 @@ export default function DomainSection({
         ) : null}
       </div>
 
-      {isDisabled && (
+      {!isSelfHosted && isDisabled && (
         <div
           className="mt-2 text-sm text-muted-foreground"
           onClick={() => {
@@ -313,19 +323,21 @@ export default function DomainSection({
       />
 
       {/* Upgrade plan modal when trying to use custom domains without the right plan */}
-      <UpgradePlanModal
-        clickedPlan={
-          linkType === "DATAROOM_LINK" ? PlanEnum.DataRooms : PlanEnum.Business
-        }
-        open={isUpgradeModalOpen}
-        setOpen={setUpgradeModalOpen}
-        trigger={
-          linkType === "DATAROOM_LINK"
-            ? "select_custom_domain_dataroom"
-            : "select_custom_domain_document"
-        }
-        highlightItem={["custom-domain"]}
-      />
+      {!isSelfHosted && (
+        <UpgradePlanModal
+          clickedPlan={
+            linkType === "DATAROOM_LINK" ? PlanEnum.DataRooms : PlanEnum.Business
+          }
+          open={isUpgradeModalOpen}
+          setOpen={setUpgradeModalOpen}
+          trigger={
+            linkType === "DATAROOM_LINK"
+              ? "select_custom_domain_dataroom"
+              : "select_custom_domain_document"
+          }
+          highlightItem={["custom-domain"]}
+        />
+      )}
     </>
   );
 }

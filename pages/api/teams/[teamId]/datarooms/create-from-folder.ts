@@ -6,6 +6,7 @@ import { DataroomFolder, Document, Folder } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
 import { newId } from "@/lib/id-helper";
+import { hasDataRoomTrial, teamHasFeature } from "@/lib/plan/guards";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 
@@ -152,31 +153,29 @@ export default async function handle(
         return res.status(401).end("Unauthorized");
       }
 
-      const limits = await getLimits({ teamId, userId });
-      const stripedTeamPlan = team.plan.replace("+old", "");
+      const hasTrialAccess = hasDataRoomTrial(team.plan);
+      const canUseDatarooms =
+        hasTrialAccess || teamHasFeature(team.plan, "datarooms");
 
-      if (
-        !team.plan.includes("drtrial") &&
-        ["business", "datarooms", "datarooms-plus"].includes(stripedTeamPlan) &&
-        limits &&
-        team._count.datarooms >= limits.datarooms
-      ) {
+      if (!canUseDatarooms) {
+        return res
+          .status(400)
+          .json({ message: "You need a Business plan to create a data room" });
+      }
+
+      const limits = await getLimits({ teamId, userId });
+
+      if (!hasTrialAccess && limits && team._count.datarooms >= limits.datarooms) {
         return res.status(403).json({
           message:
             "You've reached the limit of datarooms. Consider upgrading your plan.",
         });
       }
 
-      if (team.plan.includes("drtrial") && team._count.datarooms > 0) {
+      if (hasTrialAccess && team._count.datarooms > 0) {
         return res
           .status(400)
           .json({ message: "Trial data room already exists" });
-      }
-
-      if (["free", "pro"].includes(team.plan) && !team.plan.includes("drtrial")) {
-        return res
-          .status(400)
-          .json({ message: "You need a Business plan to create a data room" });
       }
 
       // Fetch the folder structure

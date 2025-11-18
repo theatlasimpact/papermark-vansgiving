@@ -4,6 +4,7 @@ import Bottleneck from "bottleneck";
 
 import { sendExportReadyEmail } from "@/lib/emails/send-export-ready-email";
 import prisma from "@/lib/prisma";
+import { teamHasFeature } from "@/lib/plan/guards";
 import { jobStore } from "@/lib/redis-job-store";
 import {
   getViewPageDuration,
@@ -81,7 +82,7 @@ export const exportVisitsTask = task({
         throw new Error("Team not found or access denied");
       }
 
-      if (team.plan === "free") {
+      if (!teamHasFeature(team.plan, "analyticsExport")) {
         throw new Error("This feature is not available for your plan");
       }
 

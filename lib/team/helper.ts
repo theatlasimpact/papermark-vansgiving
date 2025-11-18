@@ -2,6 +2,7 @@ import { Document, DocumentVersion, Domain, Link, View } from "@prisma/client";
 
 import prisma from "@/lib/prisma";
 import { decryptEncrpytedPassword } from "@/lib/utils";
+import { teamHasPaidPlan } from "@/lib/plan/guards";
 
 import { DocumentError, TeamError } from "../errorHandler";
 
@@ -129,11 +130,7 @@ export async function getTeamWithDomain({
   }
 
   // check if the team has a paid plan
-  // In self-hosted mode we allow custom domains for all teams.
-  const isSelfHosted = process.env.SELF_HOSTED === "true";
-  const teamHasPaidPlan = isSelfHosted || team?.plan !== "free";
-
-  if (!teamHasPaidPlan) {
+  if (!teamHasPaidPlan(team?.plan)) {
     throw new TeamError("Team doesn't have a paid plan");
   }
 

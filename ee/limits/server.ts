@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isSelfHosted } from "@/lib/plan/guards";
+
 export const configSchema = z.object({
   datarooms: z.number().optional(),
   links: z.number().optional(),
@@ -47,5 +49,9 @@ const unlimitedLimits = {
 };
 
 export async function getLimits(_params: { teamId: string; userId: string }) {
+  if (isSelfHosted()) {
+    return unlimitedLimits;
+  }
+
   return unlimitedLimits;
 }

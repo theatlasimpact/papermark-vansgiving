@@ -2,11 +2,13 @@ import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const interRegularFont = await fetch(
-    new URL("../../../../public/fonts/Inter-Regular.ttf", import.meta.url),
-  ).then((res) => res.arrayBuffer());
+  const interRegularFontUrl = new URL('/fonts/Inter-Regular.ttf', req.url);
+  const interRegularFont = await fetch(interRegularFontUrl).then((res) =>
+    res.arrayBuffer(),
+  );
 
   const year = req.nextUrl.searchParams.get("year") || "2024";
   const minutesSpentOnDocs =
