@@ -86,35 +86,64 @@ export default async function handle(
         },
       });
 
-      let links = docWithLinks!.links;
+      if (!docWithLinks) {
+        return res.status(200).json([]);
+      }
 
-      // Decrypt the password for each link
+      let links = docWithLinks.links;
+
+      // Decrypt the password for each link and ensure corrupt records don't break the response
       if (links && links.length > 0) {
         links = await Promise.all(
           links.map(async (link) => {
-            // Decrypt the password if it exists
+            let decryptedPassword: string | null = link.password;
+
             if (link.password !== null) {
-              link.password = decryptEncrpytedPassword(link.password);
+              try {
+                decryptedPassword = decryptEncrpytedPassword(link.password);
+              } catch (decryptError) {
+                decryptedPassword = null;
+                await log({
+                  message: `Failed to decrypt password for link ${link.id}: ${decryptError}`,
+                  type: "error",
+                });
+              }
             }
-            const tags = await prisma.tag.findMany({
-              where: {
-                items: {
-                  some: {
-                    linkId: link.id,
-                    itemType: "LINK_TAG",
+
+            let tags = [] as {
+              id: string;
+              name: string;
+              color: string | null;
+              description: string | null;
+            }[];
+
+            try {
+              tags = await prisma.tag.findMany({
+                where: {
+                  items: {
+                    some: {
+                      linkId: link.id,
+                      itemType: "LINK_TAG",
+                    },
                   },
                 },
-              },
-              select: {
-                id: true,
-                name: true,
-                color: true,
-                description: true,
-              },
-            });
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                  description: true,
+                },
+              });
+            } catch (tagError) {
+              await log({
+                message: `Failed to fetch tags for link ${link.id}: ${tagError}`,
+                type: "error",
+              });
+            }
 
             return {
               ...link,
+              password: decryptedPassword,
               tags,
             };
           }),
@@ -123,7 +152,7 @@ export default async function handle(
 
       return res.status(200).json(links);
     } catch (error) {
-      log({
+      await log({
         message: `Failed to get links for document: _${docId}_. \n\n ${error} \n\n*Metadata*: \`{teamId: ${teamId}, userId: ${userId}}\``,
         type: "error",
       });
