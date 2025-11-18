@@ -48,7 +48,8 @@ next-env.d.ts
 
 # Internal scripts
 pages/api/scripts
-scripts/
+scripts/*
+!scripts/forceDeleteLink.ts
 
 # marketing emails
 components/emails/marketing
