@@ -105,7 +105,7 @@ export default function UploadZone({
   dataroomName,
 }: UploadZoneProps) {
   const analytics = useAnalytics();
-  const { plan, isFree, isTrial } = usePlan();
+  const { plan, isFree, isTrial, isSelfHosted } = usePlan();
   const router = useRouter();
   const teamInfo = useTeam();
   const { data: session } = useSession();
@@ -131,18 +131,21 @@ export default function UploadZone({
     dataroomFolderCreationPromiseRef.current = null;
   }, [replicateDataroomFolders, dataroomId]);
 
+  const computedIsFree = isSelfHosted ? false : isFree;
+  const computedIsTrial = isSelfHosted ? true : isTrial;
+
   const fileSizeLimits = useMemo(
     () =>
       getFileSizeLimits({
         limits,
-        isFree,
-        isTrial,
+        isFree: computedIsFree,
+        isTrial: computedIsTrial,
       }),
-    [limits, isFree, isTrial],
+    [limits, computedIsFree, computedIsTrial],
   );
 
   const acceptableDropZoneFileTypes =
-    isFree && !isTrial
+    computedIsFree && !computedIsTrial
       ? acceptableDropZoneMimeTypesWhenIsFreePlanAndNotTrial
       : allAcceptableDropZoneMimeTypes;
 
@@ -240,14 +243,14 @@ export default function UploadZone({
         } else if (errors.find(({ code }) => code === "file-invalid-type")) {
           const isSupported = SUPPORTED_DOCUMENT_MIME_TYPES.includes(file.type);
           message = `File type not supported ${
-            isFree && !isTrial && isSupported ? `on free plan` : ""
+            computedIsFree && !computedIsTrial && isSupported ? `on free plan` : ""
           }`;
         }
         return { fileName: file.name, message };
       });
       onUploadRejected(rejected);
     },
-    [onUploadRejected, fileSizeLimits, isFree, isTrial],
+    [onUploadRejected, fileSizeLimits, computedIsFree, computedIsTrial],
   );
 
   const onDrop = useCallback(
@@ -270,7 +273,7 @@ export default function UploadZone({
             acc.invalid.push({
               fileName: file.name,
               message: `File size too big (max. ${fileSizeLimitMB} MB)${
-                isFree && !isTrial
+                computedIsFree && !computedIsTrial
                   ? ". Upgrade to a paid plan to increase the limit"
                   : ""
               }`,
@@ -573,8 +576,8 @@ export default function UploadZone({
       onUploadProgress,
       endpointTargetType,
       fileSizeLimits,
-      isFree,
-      isTrial,
+      computedIsFree,
+      computedIsTrial,
     ],
   );
 
@@ -906,7 +909,7 @@ export default function UploadZone({
                   Drop your file(s) here
                 </span>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {isFree && !isTrial
+                  {computedIsFree && !computedIsTrial
                     ? `Only *.pdf, *.xls, *.xlsx, *.csv, *.tsv, *.ods, *.png, *.jpeg, *.jpg`
                     : `Only *.pdf, *.pptx, *.docx, *.xlsx, *.xls, *.csv, *.tsv, *.ods, *.ppt, *.odp, *.doc, *.odt, *.dwg, *.dxf, *.png, *.jpg, *.jpeg, *.mp4, *.mov, *.avi, *.webm, *.ogg`}
                 </p>

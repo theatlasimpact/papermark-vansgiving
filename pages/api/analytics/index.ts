@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 
 import prisma from "@/lib/prisma";
+import { teamHasFeature } from "@/lib/plan/guards";
 import {
   getTotalDocumentDuration,
   getTotalLinkDuration,
@@ -76,7 +77,7 @@ export default async function handler(
     }
 
     // Check if free plan user is trying to access data beyond 30 days
-    if (interval === "custom" && team.plan.includes("free")) {
+    if (interval === "custom" && !teamHasFeature(team.plan, "analyticsExport")) {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       thirtyDaysAgo.setHours(0, 0, 0, 0);

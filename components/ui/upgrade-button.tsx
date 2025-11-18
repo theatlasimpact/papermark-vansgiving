@@ -1,6 +1,7 @@
 import React, { ButtonHTMLAttributes, useState } from "react";
 
 import { PlanEnum } from "@/ee/stripe/constants";
+import { usePlan } from "@/lib/swr/use-billing";
 import { CrownIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -38,6 +39,12 @@ export function UpgradeButton({
   disabled,
 }: UpgradeButtonProps) {
   const [open, setOpen] = useState(false);
+  const { isSelfHosted } = usePlan();
+
+  if (isSelfHosted) {
+    return null;
+  }
+
 
   const buttonContent = (
     <Button

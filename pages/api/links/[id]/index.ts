@@ -8,6 +8,7 @@ import {
   fetchDocumentLinkData,
 } from "@/lib/api/links/link-data";
 import prisma from "@/lib/prisma";
+import { teamHasPaidPlan } from "@/lib/plan/guards";
 import { CustomUser, WatermarkConfigSchema } from "@/lib/types";
 import {
   decryptEncrpytedPassword,
@@ -152,12 +153,13 @@ export default async function handle(
       }
 
       const teamPlan = link.team?.plan || "free";
+      const restrictPremiumFeatures = !teamHasPaidPlan(teamPlan);
 
       const returnLink = {
         ...link,
         ...linkData,
         dataroomId: undefined,
-        ...(teamPlan === "free" && {
+        ...(restrictPremiumFeatures && {
           customFields: [], // reset custom fields for free plan
           enableAgreement: false,
           enableWatermark: false,
@@ -504,7 +506,7 @@ export default async function handle(
       }
 
       // Check if team is on free plan
-      if (linkToBeDeleted.team?.plan === "free") {
+      if (!teamHasPaidPlan(linkToBeDeleted.team?.plan)) {
         return res.status(403).json({
           error:
             "Link deletion is not available on the free plan. Please upgrade to delete links.",

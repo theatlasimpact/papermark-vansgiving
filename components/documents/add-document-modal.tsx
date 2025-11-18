@@ -84,7 +84,7 @@ export function AddDocumentModal({
   >([]);
   const teamInfo = useTeam();
   const { canAddDocuments } = useLimits();
-  const { plan, isFree, isTrial } = usePlan();
+  const { plan, isFree, isTrial, isSelfHosted } = usePlan();
   const { dataroom } = useDataroom();
   const teamId = teamInfo?.currentTeam?.id as string;
 
@@ -531,7 +531,7 @@ export function AddDocumentModal({
     setAddDocumentModalOpen && setAddDocumentModalOpen(!isOpen);
   };
 
-  if (!canAddDocuments && children) {
+  if (!canAddDocuments && !isSelfHosted && children) {
     if (newVersion) {
       return (
         <UpgradePlanModal

@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 /**
  * @name Headline Template
@@ -11,9 +12,8 @@ export const runtime = "edge";
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const title = searchParams.get("title") || "Papermark Document";
-  const Inter = await fetch(
-    new URL("@/public/_static/Inter-Bold.ttf", import.meta.url),
-  ).then((res) => res.arrayBuffer());
+  const interBoldUrl = new URL('/_static/Inter-Bold.ttf', request.url);
+  const Inter = await fetch(interBoldUrl).then((res) => res.arrayBuffer());
 
   return new ImageResponse(
     (

@@ -26,13 +26,17 @@ import { UpgradePlanModal } from "../billing/upgrade-plan-modal";
 import { AddTeamModal } from "../teams/add-team-modal";
 
 export const BlockingModal = () => {
-  const { isFree, isTrial } = usePlan();
+  const { isFree, isTrial, isSelfHosted } = usePlan();
   const { data: session } = useSession();
   const { team } = useGetTeam()!;
   const { setCurrentTeam }: TeamContextType = useTeam() || initialState;
   const { teams } = useTeams();
 
   const currentUserId = (session?.user as CustomUser)?.id;
+
+  if (isSelfHosted) {
+    return null;
+  }
   const isAdmin = team?.users.some(
     (user) => user.userId === currentUserId && user.role === "ADMIN",
   );

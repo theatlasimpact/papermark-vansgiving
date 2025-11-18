@@ -1,4 +1,5 @@
 import { PLAN_NAME_MAP } from "@/ee/stripe/constants";
+import { getEffectivePlan, isSelfHosted } from "@/lib/plan/guards";
 
 export type BasePlan =
   | "free"
@@ -9,10 +10,10 @@ export type BasePlan =
   | "datarooms"
   | "datarooms-plus";
 
-type DisabledPlan = {
+type PlanState = {
   plan: BasePlan;
   planName: string;
-  originalPlan: string;
+  originalPlan: BasePlan;
   trial: string | null;
   isTrial: boolean;
   isOldAccount: boolean;
@@ -33,9 +34,11 @@ type DisabledPlan = {
   isDataroomsPlus: boolean;
   loading: boolean;
   error: unknown;
+  isSelfHosted: boolean;
+  effectivePlan: BasePlan;
 };
 
-const DEFAULT_PLAN: DisabledPlan = {
+const BASE_PLAN_STATE: PlanState = {
   plan: "business",
   planName: PLAN_NAME_MAP.business,
   originalPlan: "business",
@@ -59,26 +62,52 @@ const DEFAULT_PLAN: DisabledPlan = {
   isDataroomsPlus: false,
   loading: false,
   error: null,
+  isSelfHosted: false,
+  effectivePlan: "business",
 };
 
 const mutate = async () => undefined;
 
+function buildPlanState(): PlanState {
+  const selfHosted = isSelfHosted();
+  const effectivePlan = getEffectivePlan(BASE_PLAN_STATE.originalPlan);
+  const planName = PLAN_NAME_MAP[effectivePlan] ?? PLAN_NAME_MAP.business;
+
+  return {
+    ...BASE_PLAN_STATE,
+    plan: effectivePlan,
+    planName,
+    isFree: !selfHosted && effectivePlan === "free",
+    isStarter: !selfHosted && effectivePlan === "starter",
+    isPro: effectivePlan === "pro",
+    isBusiness: effectivePlan === "business",
+    isDatarooms: effectivePlan === "datarooms",
+    isDataroomsPlus: effectivePlan === "datarooms-plus",
+    isSelfHosted: selfHosted,
+    effectivePlan,
+  };
+}
+
+const PLAN_STATE = buildPlanState();
+
 export function useBilling() {
   return {
     id: "self-hosted-team",
-    plan: DEFAULT_PLAN.plan,
-    startsAt: DEFAULT_PLAN.startsAt,
-    endsAt: DEFAULT_PLAN.endsAt,
+    plan: PLAN_STATE.plan,
+    startsAt: PLAN_STATE.startsAt,
+    endsAt: PLAN_STATE.endsAt,
     subscriptionId: null as string | null,
     _count: { documents: 0 },
     error: null,
     loading: false,
+    isSelfHosted: PLAN_STATE.isSelfHosted,
+    effectivePlan: PLAN_STATE.effectivePlan,
   };
 }
 
 export function usePlan() {
   return {
-    ...DEFAULT_PLAN,
+    ...PLAN_STATE,
     mutate,
   };
 }

@@ -2,10 +2,10 @@ import { NextApiRequest, NextApiResponse } from "next";
 
 import { getLimits } from "@/ee/limits/server";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import slugify from "@sindresorhus/slugify";
 import { getServerSession } from "next-auth/next";
 
 import { newId } from "@/lib/id-helper";
+import { hasDataRoomTrial, teamHasFeature } from "@/lib/plan/guards";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 
@@ -102,24 +102,17 @@ export default async function handle(
       const team = await prisma.team.findUnique({
         where: {
           id: teamId,
-          plan: {
-            // exclude all teams not on `business`, `datarooms`, `datarooms-plus`, `business+old`, `datarooms+old`, `datarooms-plus+old` plan
-            in: [
-              "business",
-              "datarooms",
-              "datarooms-plus",
-              "business+old",
-              "datarooms+old",
-              "datarooms-plus+old",
-              "datarooms+drtrial",
-              "business+drtrial",
-              "datarooms-plus+drtrial",
-            ],
-          },
           users: {
             some: {
               userId: userId,
             },
+          },
+        },
+        select: {
+          id: true,
+          plan: true,
+          _count: {
+            select: { datarooms: true },
           },
         },
       });
@@ -128,19 +121,28 @@ export default async function handle(
         return res.status(401).end("Unauthorized");
       }
 
-      // Limits: Check if the user has reached the limit of datarooms in the team
-      const dataroomCount = await prisma.dataroom.count({
-        where: {
-          teamId: teamId,
-        },
-      });
+      const hasTrialAccess = hasDataRoomTrial(team.plan);
+      const canUseDatarooms =
+        hasTrialAccess || teamHasFeature(team.plan, "datarooms");
 
+      if (!canUseDatarooms) {
+        return res.status(401).end("Unauthorized");
+      }
+
+      // Limits: Check if the user has reached the limit of datarooms in the team
+      const dataroomCount = team._count.datarooms;
       const limits = await getLimits({ teamId, userId });
 
-      if (limits && dataroomCount >= limits.datarooms) {
+      if (!hasTrialAccess && limits && dataroomCount >= limits.datarooms) {
         return res
           .status(403)
           .json({ message: "You have reached the limit of datarooms" });
+      }
+
+      if (hasTrialAccess && dataroomCount > 0) {
+        return res
+          .status(400)
+          .json({ message: "Trial data room already exists" });
       }
 
       const pId = newId("dataroom");

@@ -4,6 +4,7 @@ import { PlanEnum } from "@/ee/stripe/constants";
 import { LockIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { usePlan } from "@/lib/swr/use-billing";
 
 import {
   Card,
@@ -69,6 +70,12 @@ export function FeaturePreview({
   className,
   upgradeButtonText = "Unlock",
 }: FeaturePreviewProps) {
+  const { isSelfHosted } = usePlan();
+
+  if (isSelfHosted) {
+    return <div className={cn("relative", className)}>{children}</div>;
+  }
+
   return (
     <div className={cn("relative", className)}>
       {/* Content with no interaction */}

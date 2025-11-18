@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth/next";
 import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
+import { teamHasFeature } from "@/lib/plan/guards";
 import { getDocumentWithTeamAndUser } from "@/lib/team/helper";
 import { getViewPageDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
@@ -97,7 +98,7 @@ export default async function handle(
 
       // limit the number of views to 20 on free plan
       const limitedViews =
-        result?.document?.team?.plan === "free"
+        !teamHasFeature(result?.document?.team?.plan || "free", "viewsFull")
           ? views.slice(0, LIMITS.views)
           : views;
 

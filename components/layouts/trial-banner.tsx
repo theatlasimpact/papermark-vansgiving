@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert";
 
 export default function TrialBanner() {
-  const { trial } = usePlan();
+  const { trial, isSelfHosted } = usePlan();
   const isTrial = !!trial;
   const [showTrialBanner, setShowTrialBanner] = useState<boolean | null>(null);
 
@@ -30,6 +30,10 @@ export default function TrialBanner() {
       setShowTrialBanner(false);
     }
   }, []);
+
+  if (isSelfHosted) {
+    return null;
+  }
 
   if (isTrial && showTrialBanner) {
     return <TrialBannerComponent setShowTrialBanner={setShowTrialBanner} />;
