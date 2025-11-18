@@ -4,12 +4,8 @@ import { NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const inter = await fetch(
-    new URL("@/styles/Inter-Regular.ttf", import.meta.url),
-  ).then((res) => res.arrayBuffer());
-
-  const interBold = await fetch(
-    new URL("@/public/_static/Inter-Bold.ttf", import.meta.url),
+  const interRegularFont = await fetch(
+    new URL("../../../../public/fonts/Inter-Regular.ttf", import.meta.url),
   ).then((res) => res.arrayBuffer());
 
   const year = req.nextUrl.searchParams.get("year") || "2024";
@@ -84,14 +80,8 @@ export async function GET(req: NextRequest) {
       fonts: [
         {
           name: "Inter",
-          data: inter,
+          data: interRegularFont,
           weight: 400,
-          style: "normal",
-        },
-        {
-          name: "Inter",
-          data: interBold,
-          weight: 700,
           style: "normal",
         },
       ],
