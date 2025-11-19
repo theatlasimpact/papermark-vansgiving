@@ -7,19 +7,10 @@ import {
 import { decryptSlackToken } from "@/lib/integrations/slack/utils";
 
 export class SlackClient {
-  private clientId: string;
-  private clientSecret: string;
   private baseUrl = "https://slack.com/api";
   // private oauthUrl = "https://slack.com/oauth/v2/authorize";
 
-  constructor() {
-    this.clientId = process.env.SLACK_CLIENT_ID as string;
-    this.clientSecret = process.env.SLACK_CLIENT_SECRET as string;
-
-    if (!this.clientId || !this.clientSecret) {
-      throw new Error("SLACK_CLIENT_ID and SLACK_CLIENT_SECRET must be set");
-    }
-  }
+  constructor() {}
 
   // private decryptToken(accessToken: string): string {
   //   return decryptSlackToken(accessToken);

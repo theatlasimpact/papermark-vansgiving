@@ -9,6 +9,9 @@ export const getSlackInstallationUrl = async (
   teamId: string,
 ): Promise<string> => {
   const env = getSlackEnv();
+  if (!env) {
+    throw new Error("Slack integration is not configured");
+  }
 
   const state = nanoid(16);
   await redis.set(`slack:install:state:${state}`, teamId, {
