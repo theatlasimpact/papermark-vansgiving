@@ -1,10 +1,9 @@
-// trigger.config.ts
 import { ffmpeg } from "@trigger.dev/build/extensions/core";
 import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
 import { defineConfig, timeout } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
-  project: "proj_qvgnzxziyvafzroodbjg",  // from your Trigger dashboard
+  project: "proj_qvgnzxziyvafzroodbjg",
   dirs: ["./lib/trigger"],
   maxDuration: timeout.None,
   retries: {
@@ -14,15 +13,15 @@ export default defineConfig({
       minTimeoutInMs: 1000,
       maxTimeoutInMs: 10000,
       factor: 2,
-      randomize: true,
-    },
+      randomize: true
+    }
   },
   build: {
     extensions: [
       prismaExtension({
-        schema: "prisma/schema/schema.prisma",
+        schema: "prisma/schema/schema.prisma"
       }),
-      ffmpeg(),
-    ],
-  },
+      ffmpeg()
+    ]
+  }
 });
