@@ -34,6 +34,8 @@ export default function Login() {
   const [emailButtonText, setEmailButtonText] = useState<string>(
     "Continue with Email",
   );
+  const hankoTenantId = process.env.NEXT_PUBLIC_HANKO_TENANT_ID;
+  const isPasskeyEnabled = Boolean(hankoTenantId);
 
   const emailSchema = z
     .string()
@@ -180,27 +182,30 @@ export default function Login() {
                 )}
               </Button>
             </div>
-            <div className="relative">
-              <Button
-                onClick={() => {
-                  setLastUsed("passkey");
-                  setClickedMethod("passkey");
-                  signInWithPasskey({
-                    tenantId: process.env.NEXT_PUBLIC_HANKO_TENANT_ID as string,
-                  }).then(() => {
-                    setClickedMethod(undefined);
-                  });
-                }}
-                variant="outline"
-                loading={clickedMethod === "passkey"}
-                disabled={clickedMethod && clickedMethod !== "passkey"}
-                className="flex w-full items-center justify-center space-x-2 border border-gray-300 bg-gray-100 font-normal text-gray-900 hover:bg-gray-200 hover:text-gray-900"
-              >
-                <Passkey className="h-4 w-4" />
-                <span>Continue with a passkey</span>
-                {lastUsed === "passkey" && <LastUsed />}
-              </Button>
-            </div>
+            {isPasskeyEnabled && (
+              <div className="relative">
+                <Button
+                  onClick={() => {
+                    if (!hankoTenantId) return;
+                    setLastUsed("passkey");
+                    setClickedMethod("passkey");
+                    signInWithPasskey({
+                      tenantId: hankoTenantId,
+                    }).then(() => {
+                      setClickedMethod(undefined);
+                    });
+                  }}
+                  variant="outline"
+                  loading={clickedMethod === "passkey"}
+                  disabled={clickedMethod && clickedMethod !== "passkey"}
+                  className="flex w-full items-center justify-center space-x-2 border border-gray-300 bg-gray-100 font-normal text-gray-900 hover:bg-gray-200 hover:text-gray-900"
+                >
+                  <Passkey className="h-4 w-4" />
+                  <span>Continue with a passkey</span>
+                  {lastUsed === "passkey" && <LastUsed />}
+                </Button>
+              </div>
+            )}
           </div>
           <p className="mt-10 w-full max-w-md px-4 text-xs text-muted-foreground sm:px-12">
             By clicking continue, you acknowledge that you have read and agree

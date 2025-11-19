@@ -1,6 +1,6 @@
 import { type Session } from "next-auth";
 
-import hanko from "@/lib/hanko";
+import { getHankoConfig, getHankoTenant } from "@/lib/hanko";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 
@@ -10,6 +10,11 @@ export async function startServerPasskeyRegistration({
   session: Session;
 }) {
   if (!session) throw new Error("Not logged in");
+
+  const hanko = getHankoTenant();
+  if (!hanko) {
+    throw new Error("Passkey authentication is not configured.");
+  }
 
   const sessionUser = session.user as CustomUser;
 
@@ -26,8 +31,6 @@ export async function startServerPasskeyRegistration({
   return createOptions;
 }
 
-// This is *your* server-side code; you need to implement this yourself.
-// NextAuth takes care of logging in the user after they have registered their passkey.
 export async function finishServerPasskeyRegistration({
   credential,
   session,
@@ -37,16 +40,12 @@ export async function finishServerPasskeyRegistration({
 }) {
   if (!session) throw new Error("Not logged in");
 
+  const hanko = getHankoTenant();
+  if (!hanko) {
+    throw new Error("Passkey authentication is not configured.");
+  }
+
   await hanko.registration.finalize(credential);
-
-  // const sessionUser = session.user as CustomUser;
-
-  // Now the user has registered their passkey and can use it to log in.
-
-  // const user = await prisma.user.update({
-  //   where: { email: sessionUser.email as string },
-  //   select: { id: true },
-  // });
 }
 
 export async function listUserPasskeys({ session }: { session: Session }) {
@@ -61,18 +60,17 @@ export async function listUserPasskeys({ session }: { session: Session }) {
 
   if (!user) throw new Error("User not found");
 
-  const tenantId = process.env.NEXT_PUBLIC_HANKO_TENANT_ID;
-  const apiKey = process.env.HANKO_API_KEY;
-
-  if (!tenantId || !apiKey) {
-    throw new Error("Passkey service configuration missing");
+  const config = getHankoConfig();
+  if (!config) {
+    throw new Error("Passkey service configuration missing.");
   }
+
   const response = await fetch(
-    `https://passkeys.hanko.io/${tenantId}/credentials?user_id=${user.id}`,
+    `https://passkeys.hanko.io/${config.tenantId}/credentials?user_id=${user.id}`,
     {
       method: "GET",
       headers: {
-        apiKey: apiKey,
+        apiKey: config.apiKey,
         "Content-Type": "application/json",
       },
     },
@@ -100,7 +98,6 @@ export async function removeUserPasskey({
 }) {
   if (!session) throw new Error("Not logged in");
 
-  // First verify the credential belongs to the user
   const sessionUser = session.user as CustomUser;
   const user = await prisma.user.findUnique({
     where: { email: sessionUser.email as string },
@@ -109,7 +106,6 @@ export async function removeUserPasskey({
 
   if (!user) throw new Error("User not found");
 
-  // Verify ownership by listing user's passkeys first
   const userPasskeys = await listUserPasskeys({ session });
   const ownsCredential = userPasskeys.some((pk: any) => pk.id === credentialId);
 
@@ -117,11 +113,9 @@ export async function removeUserPasskey({
     throw new Error("Unauthorized");
   }
 
-  const tenantId = process.env.NEXT_PUBLIC_HANKO_TENANT_ID;
-  const apiKey = process.env.HANKO_API_KEY;
-
-  if (!tenantId || !apiKey) {
-    throw new Error("Passkey service configuration missing");
+  const config = getHankoConfig();
+  if (!config) {
+    throw new Error("Passkey service configuration missing.");
   }
 
   const isValidCredentialId = /^[a-zA-Z0-9_-]+$/.test(credentialId);
@@ -130,11 +124,11 @@ export async function removeUserPasskey({
   }
 
   const response = await fetch(
-    `https://passkeys.hanko.io/${tenantId}/credentials/${credentialId}`,
+    `https://passkeys.hanko.io/${config.tenantId}/credentials/${credentialId}`,
     {
       method: "DELETE",
       headers: {
-        apiKey: apiKey,
+        apiKey: config.apiKey,
         "Content-Type": "application/json",
       },
     },
