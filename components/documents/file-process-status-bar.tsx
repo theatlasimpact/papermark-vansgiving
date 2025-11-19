@@ -4,6 +4,7 @@ import useSWRImmutable from "swr/immutable";
 
 import { Progress } from "@/components/ui/progress";
 
+import type { DocumentProcessingStatus } from "@/lib/documents/document-processing-types";
 import { cn, fetcher } from "@/lib/utils";
 import { useDocumentProgressStatus } from "@/lib/utils/use-progress-status";
 
@@ -14,6 +15,11 @@ const QUEUED_MESSAGES = [
   "Almost ready...",
 ];
 
+type ProgressTokenResponse = {
+  publicAccessToken: string | null;
+  processingStatus?: DocumentProcessingStatus;
+};
+
 export default function FileProcessStatusBar({
   documentVersionId,
   className,
@@ -22,42 +28,53 @@ export default function FileProcessStatusBar({
 }: {
   documentVersionId: string;
   className?: string;
-  mutateDocument: () => void;
+  mutateDocument?: () => void;
   onProcessingChange?: (processing: boolean) => void;
 }) {
   const [messageIndex, setMessageIndex] = useState(0);
-  const { data } = useSWRImmutable<{ publicAccessToken: string }>(
+  const { data } = useSWRImmutable<ProgressTokenResponse>(
     `/api/progress-token?documentVersionId=${documentVersionId}`,
     fetcher,
   );
 
   const { status: progressStatus, error: progressError } =
-    useDocumentProgressStatus(documentVersionId, data?.publicAccessToken);
+    useDocumentProgressStatus(
+      documentVersionId,
+      data?.publicAccessToken,
+      data?.processingStatus,
+    );
 
-  // Update processing state whenever status changes
   useEffect(() => {
-    if (onProcessingChange) {
-      onProcessingChange(
-        progressStatus.state === "QUEUED" ||
-          progressStatus.state === "EXECUTING",
-      );
-    }
+    if (!onProcessingChange) return;
+    onProcessingChange(
+      progressStatus.state === "QUEUED" ||
+        progressStatus.state === "EXECUTING",
+    );
   }, [progressStatus.state, onProcessingChange]);
 
-  // Cycle through messages when queued or executing
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (progressStatus.state === "QUEUED") {
-      interval = setInterval(() => {
-        setMessageIndex((current) => (current + 1) % QUEUED_MESSAGES.length);
-      }, 5000); // Change message every 5 seconds
+    if (progressStatus.state !== "QUEUED") {
+      return;
     }
 
+    const interval = setInterval(() => {
+      setMessageIndex((current) => (current + 1) % QUEUED_MESSAGES.length);
+    }, 5000);
+
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, [progressStatus.state]);
+
+  useEffect(() => {
+    if (progressStatus.state === "COMPLETED") {
+      mutateDocument?.();
+    }
+  }, [progressStatus.state, mutateDocument]);
+
+  if (progressStatus.state === "COMPLETED") {
+    return null;
+  }
 
   if (progressStatus.state === "QUEUED" && !progressError) {
     return (
@@ -95,12 +112,6 @@ export default function FileProcessStatusBar({
     );
   }
 
-  if (progressStatus.state === "COMPLETED") {
-    mutateDocument();
-    return null;
-  }
-
-  // For EXECUTING state
   return (
     <Progress
       value={progressStatus.progress || 0}

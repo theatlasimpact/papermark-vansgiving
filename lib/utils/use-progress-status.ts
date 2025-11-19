@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+
 import { type RunStatus } from "@trigger.dev/core/v3";
 import { useRealtimeRunsWithTag } from "@trigger.dev/react-hooks";
 
+import type { DocumentProcessingStatus } from "@/lib/documents/document-processing-types";
 import { parseStatus } from "@/lib/utils/generate-trigger-status";
 
 interface IDocumentProgressStatus {
@@ -13,33 +16,81 @@ interface IDocumentProgressStatus {
 
 export function useDocumentProgressStatus(
   documentVersionId: string,
-  publicAccessToken: string | undefined,
+  publicAccessToken: string | undefined | null,
+  snapshot?: DocumentProcessingStatus,
 ) {
-  const { runs, error } = useRealtimeRunsWithTag(
+  const { runs = [], error } = useRealtimeRunsWithTag(
     `version:${documentVersionId}`,
     {
       enabled: !!publicAccessToken,
-      accessToken: publicAccessToken,
+      accessToken: publicAccessToken ?? undefined,
     },
   );
 
-  // Find the most recent active run (QUEUED or EXECUTING)
+  const [terminalOverride, setTerminalOverride] =
+    useState<IDocumentProgressStatus | null>(null);
+
+  useEffect(() => {
+    if (!snapshot) {
+      setTerminalOverride(null);
+      return;
+    }
+
+    if (snapshot.state === "READY") {
+      setTerminalOverride({
+        state: "COMPLETED",
+        progress: 100,
+        text: snapshot.message || "Ready to view.",
+      });
+      return;
+    }
+
+    if (snapshot.state === "FAILED") {
+      setTerminalOverride({
+        state: "FAILED",
+        progress: 0,
+        text: snapshot.message || "Preview unavailable.",
+      });
+      return;
+    }
+
+    setTerminalOverride(null);
+  }, [snapshot]);
+
+  const baseProcessingStatus = useMemo<IDocumentProgressStatus>(() => {
+    if (snapshot?.state === "PROCESSING") {
+      return {
+        state: "EXECUTING",
+        progress: 5,
+        text: snapshot.message || "Processing document...",
+      };
+    }
+
+    return {
+      state: "QUEUED",
+      progress: 0,
+      text: "Initializing...",
+    };
+  }, [snapshot]);
+
+  if (terminalOverride) {
+    return { status: terminalOverride, error, run: runs[0] };
+  }
+
+  if (runs.length === 0) {
+    return { status: baseProcessingStatus, error, run: undefined };
+  }
+
   const activeRun = runs.find((run) =>
     ["QUEUED", "EXECUTING"].includes(run.status),
   );
 
   const status: IDocumentProgressStatus = {
     state: "QUEUED",
-    progress: 0,
-    text: "Initializing...",
+    progress: baseProcessingStatus.progress,
+    text: baseProcessingStatus.text,
   };
 
-  // If we have no runs at all
-  if (runs.length === 0) {
-    return { status, error, run: undefined };
-  }
-
-  // If we found an active run, use its status
   if (activeRun) {
     status.state = activeRun.status;
     if (activeRun.metadata) {
@@ -50,9 +101,10 @@ export function useDocumentProgressStatus(
     return { status, error, run: activeRun };
   }
 
-  // Check if any run has failed
   const failedRun = runs.find((run) =>
-    ["FAILED", "CRASHED", "CANCELED", "SYSTEM_FAILURE"].includes(run.status),
+    ["FAILED", "CRASHED", "CANCELED", "SYSTEM_FAILURE"].includes(
+      run.status,
+    ),
   );
 
   if (failedRun) {
@@ -61,11 +113,13 @@ export function useDocumentProgressStatus(
       const { progress, text } = parseStatus(failedRun.metadata);
       status.progress = progress;
       status.text = text;
+    } else {
+      status.progress = 0;
+      status.text = "Error processing document.";
     }
     return { status, error, run: failedRun };
   }
 
-  // If all runs are completed
   const allCompleted = runs.every((run) => run.status === "COMPLETED");
   if (allCompleted) {
     status.state = "COMPLETED";
@@ -76,6 +130,6 @@ export function useDocumentProgressStatus(
   return {
     status,
     error,
-    run: runs[0], // Return most recent run
+    run: runs[0],
   };
 }
