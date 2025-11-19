@@ -67,6 +67,8 @@ export interface LinkWithViews extends Link {
   customFields: CustomField[];
   tags: TagProps[];
   uploadFolderName: string | undefined;
+  corrupted?: boolean;
+  hydrationError?: string;
 }
 
 export interface LinkWithDocument extends Link {

@@ -613,33 +613,46 @@ export default function LinksTable({
                         )}
                       >
                         <TableCell className="w-[250px] truncate font-medium">
-                          <div className="flex items-center gap-x-2">
-                            {link.groupId ? (
-                              <ButtonTooltip content="Group Link">
-                                <BoxesIcon className="size-4" />
-                              </ButtonTooltip>
-                            ) : null}
-                            {link.name || `Link #${link.id.slice(-5)}`}
-                            {link.isNew && !link.isUpdated && (
-                              <Badge
-                                variant="outline"
-                                className="border-emerald-600/80 text-emerald-600/80"
-                              >
-                                New
-                              </Badge>
-                            )}
-                            {link.isUpdated && (
-                              <Badge
-                                variant="outline"
-                                className="border-blue-500/80 text-blue-500/80"
-                              >
-                                Updated
-                              </Badge>
-                            )}
-                            {link.domainId && isFree ? (
-                              <span className="ml-2 rounded-full bg-destructive px-2.5 py-0.5 text-xs text-foreground ring-1 ring-destructive">
-                                Inactive
-                              </span>
+                          <div className="flex flex-col gap-y-1">
+                            <div className="flex items-center gap-x-2">
+                              {link.groupId ? (
+                                <ButtonTooltip content="Group Link">
+                                  <BoxesIcon className="size-4" />
+                                </ButtonTooltip>
+                              ) : null}
+                              {link.name || `Link #${link.id.slice(-5)}`}
+                              {link.isNew && !link.isUpdated && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-emerald-600/80 text-emerald-600/80"
+                                >
+                                  New
+                                </Badge>
+                              )}
+                              {link.isUpdated && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-blue-500/80 text-blue-500/80"
+                                >
+                                  Updated
+                                </Badge>
+                              )}
+                              {link.domainId && isFree ? (
+                                <span className="ml-2 rounded-full bg-destructive px-2.5 py-0.5 text-xs text-foreground ring-1 ring-destructive">
+                                  Inactive
+                                </span>
+                              ) : null}
+                            </div>
+                            {link.corrupted ? (
+                              <div className="flex items-center gap-x-2 text-xs font-normal text-destructive">
+                                <Badge
+                                  variant="destructive"
+                                  className="border-destructive/40 bg-destructive/10 text-destructive"
+                                >
+                                  Corrupted
+                                </Badge>
+                                <span>Delete this link to resolve.</span>
+                              </div>
                             ) : null}
                           </div>
                         </TableCell>

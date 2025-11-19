@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/links/link-data";
 import prisma from "@/lib/prisma";
 import { teamHasPaidPlan } from "@/lib/plan/guards";
+import { canDeleteLink } from "@/lib/permissions/link";
 import { CustomUser, WatermarkConfigSchema } from "@/lib/types";
 import {
   decryptEncrpytedPassword,
@@ -473,62 +474,43 @@ export default async function handle(
         where: {
           id: id,
         },
-        include: {
-          document: {
-            select: {
-              ownerId: true,
-            },
-          },
-          dataroom: {
-            select: {
-              teamId: true,
-            },
-          },
-          team: {
-            select: {
-              plan: true,
-              users: {
-                where: {
-                  userId: userId,
-                },
-                select: {
-                  userId: true,
-                  role: true,
-                },
-              },
-            },
-          },
+        select: {
+          id: true,
+          teamId: true,
+          deletedAt: true,
         },
       });
 
-      if (!linkToBeDeleted) {
+      if (!linkToBeDeleted || linkToBeDeleted.deletedAt) {
         return res.status(404).json({ error: "Link not found" });
       }
 
-      // Check if team is on free plan
-      if (!teamHasPaidPlan(linkToBeDeleted.team?.plan)) {
-        return res.status(403).json({
-          error:
-            "Link deletion is not available on the free plan. Please upgrade to delete links.",
+      if (!linkToBeDeleted.teamId) {
+        return res.status(400).json({
+          error: "Link is not associated with a team.",
         });
       }
 
-      // Check authorization based on link type
-      let isAuthorized = false;
+      const membership = await prisma.userTeam.findUnique({
+        where: {
+          userId_teamId: {
+            userId,
+            teamId: linkToBeDeleted.teamId,
+          },
+        },
+        select: {
+          role: true,
+          blockedAt: true,
+          status: true,
+        },
+      });
 
-      if (linkToBeDeleted.documentId && linkToBeDeleted.document) {
-        // Document link - check if user owns the document
-        isAuthorized = linkToBeDeleted.document.ownerId === userId;
-      } else if (linkToBeDeleted.dataroomId && linkToBeDeleted.team) {
-        // Dataroom link - check if user is a member of the team
-        isAuthorized = linkToBeDeleted.team.users.length > 0;
+      if (!canDeleteLink(membership)) {
+        return res
+          .status(403)
+          .json({ error: "Not allowed to delete this link" });
       }
 
-      if (!isAuthorized) {
-        return res.status(401).end("Unauthorized to delete this link");
-      }
-
-      // Soft delete the link by setting deletedAt and isArchived
       await prisma.link.update({
         where: {
           id: id,
