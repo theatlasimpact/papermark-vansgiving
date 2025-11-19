@@ -4,6 +4,7 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 import { z } from "zod";
 
+import { getSlackEnv } from "@/lib/integrations/slack/env";
 import { getSlackInstallationUrl } from "@/lib/integrations/slack/install";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
@@ -20,6 +21,14 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const env = getSlackEnv();
+    if (!env) {
+      return NextResponse.json(
+        { error: "Slack integration is not configured" },
+        { status: 501 },
+      );
     }
 
     const { teamId } = oAuthAuthorizeSchema.parse(getSearchParams(req.url));
