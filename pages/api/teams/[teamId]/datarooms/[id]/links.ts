@@ -6,6 +6,7 @@ import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { CustomUser, LinkWithViews } from "@/lib/types";
 import { decryptEncrpytedPassword, log } from "@/lib/utils";
+import { safeHydrateLink } from "@/lib/api/links/safe-hydrate-link";
 
 import { authOptions } from "../../../../auth/[...nextauth]";
 
@@ -74,44 +75,84 @@ export default async function handle(
       // Decrypt the password for each link
       if (extendedLinks && extendedLinks.length > 0) {
         extendedLinks = await Promise.all(
-          extendedLinks.map(async (link) => {
-            // Decrypt the password if it exists
-            if (link.password !== null) {
-              link.password = decryptEncrpytedPassword(link.password);
-            }
-            if (link.enableUpload && link.uploadFolderId !== null) {
-              const folder = await prisma.dataroomFolder.findUnique({
-                where: {
-                  id: link.uploadFolderId,
-                },
-                select: {
-                  name: true,
-                },
-              });
-              link.uploadFolderName = folder?.name;
-            }
-            const tags = await prisma.tag.findMany({
-              where: {
-                items: {
-                  some: {
-                    linkId: link.id,
-                    itemType: "LINK_TAG",
-                  },
-                },
-              },
-              select: {
-                id: true,
-                name: true,
-                color: true,
-                description: true,
-              },
-            });
+          extendedLinks.map((link) =>
+            safeHydrateLink(link, async (hydrationTarget) => {
+              const hydratedLink = { ...hydrationTarget };
 
-            return {
-              ...link,
-              tags,
-            };
-          }),
+              if (hydratedLink.password !== null) {
+                try {
+                  hydratedLink.password = decryptEncrpytedPassword(
+                    hydratedLink.password,
+                  );
+                } catch (decryptError) {
+                  hydratedLink.password = null;
+                  await log({
+                    message: `Failed to decrypt password for link ${hydratedLink.id}: ${decryptError}`,
+                    type: "error",
+                  });
+                }
+              }
+
+              if (hydratedLink.enableUpload && hydratedLink.uploadFolderId !== null) {
+                try {
+                  const folder = await prisma.dataroomFolder.findUnique({
+                    where: {
+                      id: hydratedLink.uploadFolderId,
+                    },
+                    select: {
+                      name: true,
+                    },
+                  });
+                  hydratedLink.uploadFolderName = folder?.name;
+                } catch (folderError) {
+                  await log({
+                    message: `Failed to fetch upload folder for link ${hydratedLink.id}: ${folderError}`,
+                    type: "error",
+                  });
+                }
+              }
+
+              let tags = [] as {
+                id: string;
+                name: string;
+                color: string;
+                description: string | null;
+              }[];
+
+              try {
+                const rawTags = await prisma.tag.findMany({
+                  where: {
+                    items: {
+                      some: {
+                        linkId: hydratedLink.id,
+                        itemType: "LINK_TAG",
+                      },
+                    },
+                  },
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true,
+                    description: true,
+                  },
+                });
+                tags = rawTags.map((tag) => ({
+                  ...tag,
+                  color: tag.color ?? "#6b7280",
+                }));
+              } catch (tagError) {
+                await log({
+                  message: `Failed to fetch tags for link ${hydratedLink.id}: ${tagError}`,
+                  type: "error",
+                });
+              }
+
+              return {
+                ...hydratedLink,
+                tags,
+              };
+            }),
+          ),
         );
       }
 

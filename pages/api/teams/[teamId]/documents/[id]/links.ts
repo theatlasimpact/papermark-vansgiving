@@ -5,7 +5,8 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { CustomUser } from "@/lib/types";
+import { CustomUser, LinkWithViews } from "@/lib/types";
+import { safeHydrateLink } from "@/lib/api/links/safe-hydrate-link";
 import { decryptEncrpytedPassword, log } from "@/lib/utils";
 
 export default async function handle(
@@ -90,63 +91,72 @@ export default async function handle(
         return res.status(200).json([]);
       }
 
-      let links = docWithLinks.links;
+      let links = docWithLinks.links as unknown as LinkWithViews[];
 
       // Decrypt the password for each link and ensure corrupt records don't break the response
       if (links && links.length > 0) {
         links = await Promise.all(
-          links.map(async (link) => {
-            let decryptedPassword: string | null = link.password;
+          links.map((link) =>
+            safeHydrateLink(link, async (hydrationTarget) => {
+              const hydratedLink = { ...hydrationTarget };
+              let decryptedPassword: string | null = hydratedLink.password;
 
-            if (link.password !== null) {
+              if (hydratedLink.password !== null) {
+                try {
+                  decryptedPassword = decryptEncrpytedPassword(
+                    hydratedLink.password,
+                  );
+                } catch (decryptError) {
+                  decryptedPassword = null;
+                  await log({
+                    message: `Failed to decrypt password for link ${hydratedLink.id}: ${decryptError}`,
+                    type: "error",
+                  });
+                }
+              }
+
+              let tags = [] as {
+                id: string;
+                name: string;
+                color: string;
+                description: string | null;
+              }[];
+
               try {
-                decryptedPassword = decryptEncrpytedPassword(link.password);
-              } catch (decryptError) {
-                decryptedPassword = null;
+                const rawTags = await prisma.tag.findMany({
+                  where: {
+                    items: {
+                      some: {
+                        linkId: hydratedLink.id,
+                        itemType: "LINK_TAG",
+                      },
+                    },
+                  },
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true,
+                    description: true,
+                  },
+                });
+                tags = rawTags.map((tag) => ({
+                  ...tag,
+                  color: tag.color ?? "#6b7280",
+                }));
+              } catch (tagError) {
                 await log({
-                  message: `Failed to decrypt password for link ${link.id}: ${decryptError}`,
+                  message: `Failed to fetch tags for link ${hydratedLink.id}: ${tagError}`,
                   type: "error",
                 });
               }
-            }
 
-            let tags = [] as {
-              id: string;
-              name: string;
-              color: string | null;
-              description: string | null;
-            }[];
-
-            try {
-              tags = await prisma.tag.findMany({
-                where: {
-                  items: {
-                    some: {
-                      linkId: link.id,
-                      itemType: "LINK_TAG",
-                    },
-                  },
-                },
-                select: {
-                  id: true,
-                  name: true,
-                  color: true,
-                  description: true,
-                },
-              });
-            } catch (tagError) {
-              await log({
-                message: `Failed to fetch tags for link ${link.id}: ${tagError}`,
-                type: "error",
-              });
-            }
-
-            return {
-              ...link,
-              password: decryptedPassword,
-              tags,
-            };
-          }),
+              return {
+                ...hydratedLink,
+                password: decryptedPassword,
+                tags,
+              };
+            }),
+          ),
         );
       }
 

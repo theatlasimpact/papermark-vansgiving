@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
-import { Role } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -8,19 +7,7 @@ import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
-
-const OWNER_ROLE = "OWNER" as Role;
-const ROLE_VALUES = Object.values(Role) as string[];
-const AUTHORIZED_ROLES: Role[] = Array.from(
-  new Set(
-    [
-      ...(ROLE_VALUES.includes("OWNER") ? [OWNER_ROLE] : []),
-      Role.ADMIN,
-      Role.MANAGER,
-      Role.MEMBER,
-    ].filter(Boolean),
-  ),
-);
+import { canDeleteLink } from "@/lib/permissions/link";
 
 export default async function handle(
   req: NextApiRequest,
@@ -53,26 +40,21 @@ export default async function handle(
   }
 
   try {
-    const teamAccess = await prisma.userTeam.findFirst({
+    const membership = await prisma.userTeam.findUnique({
       where: {
-        userId,
-        teamId,
-        status: "ACTIVE",
-        role: {
-          in: AUTHORIZED_ROLES,
+        userId_teamId: {
+          userId,
+          teamId,
         },
       },
       select: {
         role: true,
-        team: {
-          select: {
-            plan: true,
-          },
-        },
+        blockedAt: true,
+        status: true,
       },
     });
 
-    if (!teamAccess) {
+    if (!canDeleteLink(membership)) {
       await log({
         message: `Link delete denied: user ${userId} is not allowed to edit team ${teamId}. Link ${linkId}.`,
         type: "error",
@@ -80,13 +62,6 @@ export default async function handle(
       return res
         .status(403)
         .json({ error: "You do not have permission to delete this link." });
-    }
-
-    if (teamAccess.team.plan === "free") {
-      return res.status(403).json({
-        error:
-          "Link deletion is not available on the free plan. Please upgrade to delete links.",
-      });
     }
 
     const linkToDelete = await prisma.link.findFirst({
