@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import PasskeyProvider from "@teamhanko/passkeys-next-auth-provider";
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
+import type { Provider } from "next-auth/providers/index";
 import GoogleProvider from "next-auth/providers/google";
 import LinkedInProvider from "next-auth/providers/linkedin";
 
@@ -13,7 +14,7 @@ import { dub } from "@/lib/dub";
 import { isBlacklistedEmail } from "@/lib/edge-config/blacklist";
 import { sendWelcomeEmail } from "@/lib/emails/send-welcome";
 import { sendVerificationRequest } from "@/lib/resend";
-import hanko from "@/lib/hanko";
+import { getHankoTenant } from "@/lib/hanko";
 import prisma from "@/lib/prisma";
 import { CreateUserEmailProps, CustomUser } from "@/lib/types";
 import { subscribe } from "@/lib/unsend";
@@ -21,6 +22,54 @@ import { log } from "@/lib/utils";
 import { getIpAddress } from "@/lib/utils/ip";
 
 const VERCEL_DEPLOYMENT = !!process.env.VERCEL_URL;
+
+const hankoTenant = getHankoTenant();
+
+const providers: Provider[] = [
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID as string,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    allowDangerousEmailAccountLinking: true,
+  }),
+  LinkedInProvider({
+    clientId: process.env.LINKEDIN_CLIENT_ID as string,
+    clientSecret: process.env.LINKEDIN_CLIENT_SECRET as string,
+    authorization: {
+      params: { scope: "openid profile email" },
+    },
+    issuer: "https://www.linkedin.com/oauth",
+    jwks_endpoint: "https://www.linkedin.com/oauth/openid/jwks",
+    profile(profile, tokens) {
+      const defaultImage = "https://cdn-icons-png.flaticon.com/512/174/174857.png";
+      return {
+        id: profile.sub,
+        name: profile.name,
+        email: profile.email,
+        image: profile.picture ?? defaultImage,
+      };
+    },
+    allowDangerousEmailAccountLinking: true,
+  }),
+  EmailProvider({
+    from: "Vansgiving Sponsor Deck <login@joinvansgiving.com>",
+    sendVerificationRequest,
+  }),
+];
+
+if (hankoTenant) {
+  providers.push(
+    PasskeyProvider({
+      tenant: hankoTenant,
+      async authorize({ userId }) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) return null;
+        return user;
+      },
+    }) as Provider,
+  );
+} else {
+  console.warn("Passkey provider disabled because Hanko is not configured.");
+}
 
 // This function can run for a maximum of 180 seconds
 export const config = {
@@ -31,45 +80,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     error: "/login",
   },
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      allowDangerousEmailAccountLinking: true,
-    }),
-    LinkedInProvider({
-      clientId: process.env.LINKEDIN_CLIENT_ID as string,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET as string,
-      authorization: {
-        params: { scope: "openid profile email" },
-      },
-      issuer: "https://www.linkedin.com/oauth",
-      jwks_endpoint: "https://www.linkedin.com/oauth/openid/jwks",
-      profile(profile, tokens) {
-        const defaultImage =
-          "https://cdn-icons-png.flaticon.com/512/174/174857.png";
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture ?? defaultImage,
-        };
-      },
-      allowDangerousEmailAccountLinking: true,
-    }),
-    EmailProvider({
-      from: "Vansgiving Sponsor Deck <login@joinvansgiving.com>",
-      sendVerificationRequest,
-    }),
-    PasskeyProvider({
-      tenant: hanko,
-      async authorize({ userId }) {
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) return null;
-        return user;
-      },
-    }),
-  ],
+  providers,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   cookies: {
@@ -79,7 +90,6 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        // Do not set a fixed domain so cookies work on preview URLs and the final custom domain
         secure: VERCEL_DEPLOYMENT,
       },
     },
@@ -93,7 +103,6 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.user = user;
       }
-      // refresh the user data
       if (trigger === "update") {
         const user = token?.user as CustomUser;
         const refreshedUser = await prisma.user.findUnique({
@@ -106,7 +115,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (refreshedUser?.email !== user.email) {
-          // if user has changed email, delete all accounts for the user
           if (user.id && refreshedUser.email) {
             await prisma.account.deleteMany({
               where: { userId: user.id },
@@ -166,7 +174,6 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
           return false;
         }
 
-        // Apply rate limiting for signin attempts
         try {
           if (req) {
             const clientIP = getIpAddress(req.headers);
@@ -180,7 +187,7 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
                 message: `Rate limit exceeded for IP ${clientIP} during signin attempt`,
                 type: "error",
               });
-              return false; // Block the signin
+              return false;
             }
           }
         } catch (error) {}
@@ -191,7 +198,6 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
     events: {
       ...authOptions.events,
       signIn: async (message) => {
-        // Identify and track sign-in without blocking the event flow
         await Promise.allSettled([
           identifyUser(message.user.email ?? message.user.id),
           trackAnalytics({
@@ -202,7 +208,6 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
 
         if (message.isNewUser) {
           const { dub_id } = req.cookies;
-          // Only fire lead event if Dub is enabled
           if (dub_id && process.env.DUB_API_KEY) {
             try {
               await dub.track.lead({
@@ -223,9 +228,6 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
   };
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
-  return NextAuth(req, res, getAuthOptions(req));
+export default async function auth(req: NextApiRequest, res: NextApiResponse) {
+  return await NextAuth(req, res, getAuthOptions(req));
 }
