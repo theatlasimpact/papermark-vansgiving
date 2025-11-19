@@ -1,16 +1,12 @@
+// trigger.config.ts
 import { ffmpeg } from "@trigger.dev/build/extensions/core";
 import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
 import { defineConfig, timeout } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
-  // Use the project ref shown in your Trigger.dev dashboard:
-  // Project settings → Project ref
-  project: "proj_qvgnzxziyvafzroodbjg",
-
-  // Where your jobs live
+  project: "proj_qvgnzxziyvafzroodbjg",  // from your Trigger dashboard
   dirs: ["./lib/trigger"],
-
-  maxDuration: timeout.None, // no max duration
+  maxDuration: timeout.None,
   retries: {
     enabledInDev: false,
     default: {
