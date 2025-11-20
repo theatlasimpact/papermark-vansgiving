@@ -71,8 +71,8 @@
     "@tiptap/react": "^3.6.2",
     "@tiptap/starter-kit": "^3.6.2",
     "@tremor/react": "^3.18.7",
-    "@trigger.dev/react-hooks": "^4.1.1",
-    "@trigger.dev/sdk": "^4.1.1",
+    "@trigger.dev/react-hooks": "3.3.17",
+    "@trigger.dev/sdk": "3.3.17",
     "@tus/s3-store": "^1.9.1",
     "@tus/server": "^1.10.2",
     "@tus/utils": "^0.5.1",
@@ -110,6 +110,7 @@
     "next-auth": "^4.24.11",
     "next-plausible": "^3.12.4",
     "next-themes": "^0.4.6",
+    "nodemailer": "^6.10.1",
     "notion-client": "^7.6.0",
     "notion-utils": "^7.6.0",
     "nuqs": "^2.7.0",
@@ -155,7 +156,7 @@
   "devDependencies": {
     "@react-email/preview-server": "^4.2.12",
     "@tailwindcss/forms": "^0.5.10",
-    "@trigger.dev/build": "^4.1.1",
+    "@trigger.dev/build": "3.3.17",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie": "^0.6.0",
@@ -172,8 +173,8 @@
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.6.14",
     "prisma": "^6.5.0",
-    "typescript": "^5",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5"
   },
   "overrides": {
     "react-notion-x": {
