@@ -3,8 +3,9 @@ import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
 import { defineConfig, timeout } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
-  project: "proj_qvgnzxziyvafzroodbjg",
-  dirs: ["./lib/trigger"],
+  project: "papermark-vansgiving-uCzl",
+  runtime: "node",
+  triggerDirectories: ["./lib/trigger", "./trigger"],
   maxDuration: timeout.None,
   retries: {
     enabledInDev: false,
@@ -19,7 +20,8 @@ export default defineConfig({
   build: {
     extensions: [
       prismaExtension({
-        schema: "prisma/schema/schema.prisma"
+        schema: "prisma/schema/schema.prisma",
+        mode: "legacy",
       }),
       ffmpeg()
     ]

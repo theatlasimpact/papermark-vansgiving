@@ -2,7 +2,7 @@ import { NextRouter } from "next/router";
 
 import slugify from "@sindresorhus/slugify";
 import { upload } from "@vercel/blob/client";
-import { Message } from "ai";
+import { Message } from "ai-legacy";
 import bcrypt from "bcryptjs";
 import * as chrono from "chrono-node";
 import { type ClassValue, clsx } from "clsx";

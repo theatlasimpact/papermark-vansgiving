@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { AssistantStatus, type Message } from "ai/react";
+import { AssistantStatus, type Message } from "ai-legacy/react";
 import Textarea from "react-textarea-autosize";
 
 import { Button } from "@/components/ui/button";
