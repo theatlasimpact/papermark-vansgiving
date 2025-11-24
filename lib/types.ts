@@ -211,6 +211,7 @@ export interface DomainConfigResponse {
   acceptedChallenges?: ("dns-01" | "http-01")[];
   /** Whether or not the domain is configured AND we can automatically generate a TLS certificate. */
   misconfigured: boolean;
+  recommendedCNAME?: string;
   /** conflicts */
   conflicts: {
     name: string;

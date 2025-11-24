@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { receiver } from "@/lib/cron";
+import { domainTargetsProject } from "@/lib/domain-targets";
 import {
   getConfigResponse,
   getDomainResponse,
@@ -67,6 +68,10 @@ export async function POST(req: Request) {
           getConfigResponse(slug),
         ]);
 
+        const dnsAligned = configJson?.misconfigured
+          ? await domainTargetsProject(slug, configJson)
+          : true;
+
         let newVerified;
 
         if (domainJson?.error?.code === "not_found") {
@@ -78,10 +83,10 @@ export async function POST(req: Request) {
           } else {
             newVerified = false;
           }
-        } else if (!configJson.misconfigured) {
+        } else if (!configJson?.misconfigured) {
           newVerified = true;
         } else {
-          newVerified = false;
+          newVerified = dnsAligned;
         }
 
         const prismaResponse = await prisma.domain.update({
