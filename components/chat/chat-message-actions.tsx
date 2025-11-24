@@ -1,6 +1,6 @@
 "use client";
 
-import { type Message } from "ai";
+import { type Message } from "ai-legacy";
 
 import { Button } from "@/components/ui/button";
 

@@ -1,4 +1,4 @@
-import { type Message } from "ai";
+import { type Message } from "ai-legacy";
 
 import { cn } from "@/lib/utils";
 

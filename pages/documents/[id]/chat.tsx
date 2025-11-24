@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { type Message } from "ai/react";
+import { type Message } from "ai-legacy/react";
 import { getServerSession } from "next-auth";
 import { usePlausible } from "next-plausible";
 

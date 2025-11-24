@@ -1,5 +1,5 @@
 import { Ratelimit } from "@upstash/ratelimit";
-import { experimental_AssistantResponse } from "ai";
+import { experimental_AssistantResponse } from "ai-legacy";
 import { type MessageContentText } from "openai/resources/beta/threads/messages/messages";
 import { type Run } from "openai/resources/beta/threads/runs/runs";
 
