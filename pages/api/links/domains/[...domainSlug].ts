@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/links/link-data";
 import prisma from "@/lib/prisma";
 import { log } from "@/lib/utils";
+import { isUnrestrictedAdmin } from "@/lib/super-admin";
 import { checkGlobalBlockList } from "@/lib/utils/global-block-list";
 
 export default async function handle(
@@ -130,10 +131,10 @@ export default async function handle(
       }
 
       const { email } = req.query as { email?: string };
-      const globalBlockCheck = checkGlobalBlockList(
-        email,
-        link.team?.globalBlockList,
-      );
+      const isUnrestricted = isUnrestrictedAdmin(email);
+      const globalBlockCheck = isUnrestricted
+        ? { isBlocked: false }
+        : checkGlobalBlockList(email, link.team?.globalBlockList);
       if (globalBlockCheck.error) {
         return res.status(400).json({ message: globalBlockCheck.error });
       }
@@ -142,10 +143,12 @@ export default async function handle(
       }
 
       const teamPlan = link.team?.plan || "free";
-      const isSelfHosted = process.env.SELF_HOSTED === "true";
+      const isSelfHosted =
+        (process.env.SELF_HOSTED ?? process.env.NEXT_PUBLIC_SELF_HOSTED ?? "true") ===
+        "true";
       const teamId = link.teamId;
       // if owner of document is on free plan, return 404
-      if (teamPlan.includes("free") && !isSelfHosted) {
+      if (teamPlan.includes("free") && !isSelfHosted && !isUnrestricted) {
         log({
           message: `Link is from a free team _${teamId}_ for custom domain _${domain}/${slug}_`,
           type: "info",

@@ -1,6 +1,12 @@
 import { get } from "@vercel/edge-config";
 
+import { isUnrestrictedAdmin } from "@/lib/super-admin";
+
 export const isBlacklistedEmail = async (email: string) => {
+  if (isUnrestrictedAdmin(email)) {
+    return false;
+  }
+
   if (!process.env.EDGE_CONFIG) {
     return false;
   }
