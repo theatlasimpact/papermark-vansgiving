@@ -2,12 +2,14 @@ import { useState } from "react";
 
 import { useTeam } from "@/context/team-context";
 import { PlanEnum } from "@/ee/stripe/constants";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { useAnalytics } from "@/lib/analytics";
 import { usePlan } from "@/lib/swr/use-billing";
 import useLimits from "@/lib/swr/use-limits";
+import { isPrivilegedAdmin } from "@/lib/utils/admin";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,9 +43,11 @@ export function AddDomainModal({
   const [domain, setDomain] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
+  const { data: session } = useSession();
   const teamInfo = useTeam();
   const { isFree, isPro, isBusiness, isSelfHosted } = usePlan();
-  const { limits } = useLimits();
+  const { limits, isAdminUnlimited } = useLimits();
+  const isAdmin = isPrivilegedAdmin(session?.user?.email);
   const analytics = useAnalytics();
   const addDomainSchema = z.object({
     name: z
@@ -110,6 +114,8 @@ export function AddDomainModal({
   // => then show the upgrade modal
   const shouldShowUpgrade =
     !isSelfHosted &&
+    !isAdmin &&
+    !isAdminUnlimited &&
     (
       isFree ||
       (isPro && !limits?.customDomainOnPro) ||
@@ -170,8 +176,8 @@ export function AddDomainModal({
             onChange={(e) => setDomain(e.target.value)}
           />
           <DialogFooter>
-            <Button type="submit" className="h-9 w-full">
-              Add domain
+            <Button type="submit" className="h-9 w-full" disabled={loading}>
+              {loading ? "Adding..." : "Add domain"}
             </Button>
           </DialogFooter>
         </form>

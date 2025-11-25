@@ -1,8 +1,9 @@
-import { useEffect } from "react";
-
+import { useTeam } from "@/context/team-context";
 import { XIcon } from "lucide-react";
+import useSWRImmutable from "swr/immutable";
 import { toast } from "sonner";
 
+import { fetcher } from "@/lib/utils";
 import { useDocumentPreview } from "@/lib/swr/use-document-preview";
 
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,30 @@ export function DocumentPreviewModal({
   isOpen,
   onClose,
 }: DocumentPreviewModalProps) {
+  const { currentTeam } = useTeam();
+  const teamId = currentTeam?.id;
   const {
     document: documentData,
     loading,
     error,
   } = useDocumentPreview(documentId, isOpen);
+
+  const { data: overview } = useSWRImmutable<Record<string, any>>(
+    isOpen && teamId
+      ? `/api/teams/${teamId}/documents/${documentId}/overview`
+      : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    },
+  );
+
+  const fallbackFileUrl =
+    overview?.versions?.[0]?.originalFile ||
+    overview?.versions?.[0]?.file ||
+    overview?.originalFile ||
+    overview?.file;
 
   const handleClose = () => {
     onClose();
@@ -43,6 +63,16 @@ export function DocumentPreviewModal({
     e.stopPropagation();
   };
 
+  const handleOpenOriginal = () => {
+    if (fallbackFileUrl) {
+      window.open(fallbackFileUrl, "_blank");
+    } else {
+      toast.error(
+        "Original file unavailable. Please re-upload and retry preview.",
+      );
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
@@ -52,7 +82,17 @@ export function DocumentPreviewModal({
         isPreviewDialog
       >
         {/* Header with close button */}
-        <div className="absolute right-4 top-4 z-50">
+        <div className="absolute right-4 top-4 z-50 flex gap-2">
+          {fallbackFileUrl ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleOpenOriginal}
+              className="rounded-full bg-white/10 text-white hover:bg-white/20"
+            >
+              Open original file
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
@@ -76,10 +116,22 @@ export function DocumentPreviewModal({
         {/* Error state */}
         {error && (
           <div className="flex h-full w-full items-center justify-center">
-            <div className="text-center">
+            <div className="space-y-3 text-center">
               <p className="text-red-400">
                 {(error as Error).message || "Failed to load document preview"}
               </p>
+              <p className="text-sm text-gray-400">
+                Trigger.dev preview runners might be idle. You can still open
+                the original file below.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleOpenOriginal}
+                disabled={!fallbackFileUrl}
+              >
+                {fallbackFileUrl ? "Open original" : "Original unavailable"}
+              </Button>
             </div>
           </div>
         )}

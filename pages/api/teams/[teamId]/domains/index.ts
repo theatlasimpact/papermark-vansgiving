@@ -8,6 +8,10 @@ import prisma from "@/lib/prisma";
 import { getTeamWithDomain } from "@/lib/team/helper";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
+import {
+  isPrivilegedAdmin,
+  isPrivilegedDomain,
+} from "@/lib/utils/admin";
 
 import { authOptions } from "../../../auth/[...nextauth]";
 
@@ -55,7 +59,8 @@ export default async function handle(
       return;
     }
 
-    const userId = (session.user as CustomUser).id;
+    const sessionUser = session.user as CustomUser;
+    const userId = sessionUser.id;
     const { teamId } = req.query as { teamId: string };
 
     if (!teamId) {
@@ -68,48 +73,65 @@ export default async function handle(
         userId,
       });
 
-      // Assuming data is an object with `domain` properties
       const { domain } = req.body;
 
-      // Sanitize domain by removing whitespace, protocol, and paths
       const sanitizedDomain = domain
         .trim()
         .toLowerCase()
         .replace(/^(?:https?:\/\/)?(?:www\.)?/i, "")
         .split("/")[0];
 
-      // Check if domain is valid
-      const validDomain = validDomainRegex.test(sanitizedDomain);
-      if (validDomain !== true) {
-        return res.status(422).json("Invalid domain");
+      const isAdminOverride =
+        isPrivilegedAdmin(sessionUser.email) &&
+        isPrivilegedDomain(sanitizedDomain);
+
+      if (!isAdminOverride) {
+        const validDomain = validDomainRegex.test(sanitizedDomain);
+        if (validDomain !== true) {
+          return res.status(422).json("Invalid domain");
+        }
+
+        if (sanitizedDomain.toLowerCase().includes("papermark")) {
+          return res
+            .status(400)
+            .json({ message: "Domain cannot contain 'papermark'" });
+        }
+
+        const existingDomain = await prisma.domain.findFirst({
+          where: {
+            slug: sanitizedDomain,
+          },
+        });
+
+        if (existingDomain) {
+          return res.status(400).json({ message: "Domain already exists" });
+        }
       }
 
-      // Check if domain contains papermark
-      if (sanitizedDomain.toLowerCase().includes("papermark")) {
-        return res
-          .status(400)
-          .json({ message: "Domain cannot contain 'papermark'" });
-      }
-
-      // Check if domain already exists
-      const existingDomain = await prisma.domain.findFirst({
-        where: {
-          slug: sanitizedDomain,
+      const response = await prisma.domain.upsert({
+        where: { slug: sanitizedDomain },
+        update: {
+          userId,
+          teamId,
+          verified: isAdminOverride ? true : undefined,
+          lastChecked: isAdminOverride ? new Date() : undefined,
         },
-      });
-
-      if (existingDomain) {
-        return res.status(400).json({ message: "Domain already exists" });
-      }
-
-      const response = await prisma.domain.create({
-        data: {
+        create: {
           slug: sanitizedDomain,
           userId,
           teamId,
+          verified: isAdminOverride ? true : undefined,
         },
       });
-      await addDomainToVercel(sanitizedDomain);
+
+      if (!isAdminOverride) {
+        await addDomainToVercel(sanitizedDomain);
+      } else {
+        await log({
+          message: `Admin override accepted domain ${sanitizedDomain} without DNS verification`,
+          type: "info",
+        });
+      }
 
       return res.status(201).json(response);
     } catch (error) {

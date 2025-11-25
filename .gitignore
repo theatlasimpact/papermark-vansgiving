@@ -50,6 +50,7 @@ next-env.d.ts
 pages/api/scripts
 scripts/*
 !scripts/forceDeleteLink.ts
+!scripts/admin-validation.sh
 
 # marketing emails
 components/emails/marketing
