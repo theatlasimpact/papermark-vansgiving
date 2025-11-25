@@ -12,14 +12,15 @@ import LinkedInProvider from "next-auth/providers/linkedin";
 import { identifyUser, trackAnalytics } from "@/lib/analytics";
 import { dub } from "@/lib/dub";
 import { isBlacklistedEmail } from "@/lib/edge-config/blacklist";
-import { sendWelcomeEmail } from "@/lib/emails/send-welcome";
-import { sendVerificationRequest } from "@/lib/resend";
 import { getHankoTenant } from "@/lib/hanko";
 import prisma from "@/lib/prisma";
 import { CreateUserEmailProps, CustomUser } from "@/lib/types";
 import { subscribe } from "@/lib/unsend";
 import { log } from "@/lib/utils";
 import { getIpAddress } from "@/lib/utils/ip";
+import { sendWelcomeEmail } from "@/lib/emails/send-welcome";
+import { sendVerificationRequest } from "@/lib/resend";
+import { isUnrestrictedAdmin } from "@/lib/super-admin";
 
 const VERCEL_DEPLOYMENT = !!process.env.VERCEL_URL;
 
@@ -97,16 +98,18 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     jwt: async (params) => {
       const { token, user, trigger } = params;
-      if (!token.email) {
+      const emailToCheck = token.email ?? user?.email;
+      if (!token.email && !user?.email) {
         return {};
       }
       if (user) {
         token.user = user;
       }
+      token.isUnrestrictedAdmin = isUnrestrictedAdmin(emailToCheck);
       if (trigger === "update") {
-        const user = token?.user as CustomUser;
+        const currentUser = token?.user as CustomUser;
         const refreshedUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: currentUser.id },
         });
         if (refreshedUser) {
           token.user = refreshedUser;
@@ -114,10 +117,10 @@ export const authOptions: NextAuthOptions = {
           return {};
         }
 
-        if (refreshedUser?.email !== user.email) {
-          if (user.id && refreshedUser.email) {
+        if (refreshedUser?.email !== currentUser.email) {
+          if (currentUser.id && refreshedUser.email) {
             await prisma.account.deleteMany({
-              where: { userId: user.id },
+              where: { userId: currentUser.id },
             });
           }
         }
@@ -130,6 +133,9 @@ export const authOptions: NextAuthOptions = {
         // @ts-ignore
         ...(token || session).user,
       };
+      (session.user as any).isUnrestrictedAdmin =
+        token.isUnrestrictedAdmin ||
+        isUnrestrictedAdmin((session.user as CustomUser)?.email);
       return session;
     },
   },

@@ -49,10 +49,11 @@ function sanitizePlan(plan?: string | null) {
 }
 
 export function isSelfHosted() {
-  const serverValue = process.env.SELF_HOSTED ?? process.env.NEXT_PUBLIC_SELF_HOSTED;
+  const serverValue =
+    process.env.SELF_HOSTED ?? process.env.NEXT_PUBLIC_SELF_HOSTED ?? "true";
   const clientValue =
     typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_SELF_HOSTED
+      ? process.env.NEXT_PUBLIC_SELF_HOSTED ?? "true"
       : undefined;
 
   const flag = typeof window === "undefined" ? serverValue : clientValue;

@@ -1,3 +1,4 @@
+import { isUnrestrictedAdmin } from "@/lib/super-admin";
 import { isEmailMatched } from "@/lib/utils/email-domain";
 import { validateEmail } from "@/lib/utils/validate-email";
 
@@ -5,6 +6,10 @@ export function checkGlobalBlockList(
   email: string | undefined,
   globalBlockList: string[] | undefined,
 ): { isBlocked: boolean; error?: string } {
+  if (isUnrestrictedAdmin(email)) {
+    return { isBlocked: false };
+  }
+
   if (!email || !globalBlockList || globalBlockList.length === 0) {
     return { isBlocked: false };
   }
