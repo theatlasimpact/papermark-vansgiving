@@ -62,7 +62,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     isTrial,
   } = usePlan();
 
-  const { limits } = useLimits();
+  const { limits, isAdminUnlimited } = useLimits();
   const linksLimit = limits?.links;
   const documentsLimit = limits?.documents;
 
@@ -200,6 +200,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ],
   };
 
+  // Remove Billing entry for the admin override
+  if (isAdminUnlimited) {
+    const settingsNav = data.navMain.find((item) => item.title === "Settings");
+    if (settingsNav && settingsNav.items) {
+      settingsNav.items = settingsNav.items.filter(
+        (item) => item.title !== "Billing",
+      );
+    }
+  }
+
   return (
     <Sidebar
       className="bg-gray-50 dark:bg-black"
@@ -215,17 +225,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </p>
         <p className="ml-2 flex items-center text-2xl font-bold tracking-tighter text-black group-data-[collapsible=icon]:hidden dark:text-white">
           <Link href="/dashboard">Papermark</Link>
-          {userPlan && !isFree && !isDataroomsPlus ? (
+          {isAdminUnlimited ? (
+            <span className="ml-4 rounded-full bg-background px-2.5 py-1 text-xs tracking-normal text-foreground ring-1 ring-gray-800">
+              Unlimited
+            </span>
+          ) : null}
+          {!isAdminUnlimited && userPlan && !isFree && !isDataroomsPlus ? (
             <span className="ml-4 rounded-full bg-background px-2.5 py-1 text-xs tracking-normal text-foreground ring-1 ring-gray-800">
               {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)}
             </span>
           ) : null}
-          {isDataroomsPlus ? (
+          {!isAdminUnlimited && isDataroomsPlus ? (
             <span className="ml-4 rounded-full bg-background px-2.5 py-1 text-xs tracking-normal text-foreground ring-1 ring-gray-800">
               Datarooms+
             </span>
           ) : null}
-          {isTrial ? (
+          {!isAdminUnlimited && isTrial ? (
             <span className="ml-2 rounded-sm bg-foreground px-2 py-0.5 text-xs tracking-normal text-background ring-1 ring-gray-800">
               Trial
             </span>
@@ -256,23 +271,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {!slackIntegration && showSlackBanner ? (
                 <SlackBanner setShowSlackBanner={setShowSlackBanner} />
               ) : null}
-              {/*
-               * if user is free and showProBanner is true show pro banner
-               */}
-              {isFree && showProBanner ? (
+              {/* Hide upgrade banners for admin override */}
+              {!isAdminUnlimited && isFree && showProBanner ? (
                 <ProBanner setShowProBanner={setShowProBanner} />
               ) : null}
-              {/*
-               * if user is pro and showProAnnualBanner is true show pro annual banner
-               */}
-              {isPro && !isAnnualPlan && showProAnnualBanner ? (
+              {!isAdminUnlimited && isPro && !isAnnualPlan && showProAnnualBanner ? (
                 <ProAnnualBanner
                   setShowProAnnualBanner={setShowProAnnualBanner}
                 />
               ) : null}
 
               <div className="mb-2">
-                {linksLimit ? (
+                {!isAdminUnlimited && linksLimit ? (
                   <UsageProgress
                     title="Links"
                     unit="links"
@@ -280,7 +290,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     usageLimit={linksLimit}
                   />
                 ) : null}
-                {documentsLimit ? (
+                {!isAdminUnlimited && documentsLimit ? (
                   <UsageProgress
                     title="Documents"
                     unit="documents"
@@ -288,7 +298,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     usageLimit={documentsLimit}
                   />
                 ) : null}
-                {linksLimit || documentsLimit ? (
+                {isAdminUnlimited ? (
+                  <p className="mt-2 px-2 text-xs text-muted-foreground">
+                    Unlimited usage enabled for admin override. All limits are
+                    bypassed.
+                  </p>
+                ) : linksLimit || documentsLimit ? (
                   <p className="mt-2 px-2 text-xs text-muted-foreground">
                     Change plan to increase usage limits
                   </p>
