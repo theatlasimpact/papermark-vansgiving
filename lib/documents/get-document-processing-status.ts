@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 
-import { DISABLE_DOCUMENT_PROCESSING } from "./processing-flags";
+import { isDocumentProcessingDisabled } from "./processing-flags";
 import type { DocumentProcessingStatus } from "./document-processing-types";
 
 const PROCESSABLE_TYPES = ["pdf", "docs", "slides", "cad"];
@@ -23,7 +23,7 @@ function getProcessingTimeoutMs() {
 export async function getDocumentProcessingStatus(
   documentVersionId: string,
 ): Promise<DocumentProcessingStatus> {
-  if (DISABLE_DOCUMENT_PROCESSING) {
+  if (isDocumentProcessingDisabled) {
     return {
       state: "READY",
       message: "Processing disabled; ready to view.",

@@ -18,7 +18,7 @@ import { mutate } from "swr";
 
 import { type DataroomFolderDocument } from "@/lib/swr/use-dataroom";
 import { type DocumentWithLinksAndLinkCountAndViewCount } from "@/lib/types";
-import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
+import { isDocumentProcessingDisabled } from "@/lib/documents/processing-flags";
 import { cn, nFormatter, timeAgo } from "@/lib/utils";
 import { fileIcon } from "@/lib/utils/get-file-icon";
 import {
@@ -85,6 +85,7 @@ export default function DataroomDocumentCard({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const primaryVersion = dataroomDocument.document.versions?.[0];
+  const processingDisabled = isDocumentProcessingDisabled;
   const primaryVersionId = primaryVersion?.id;
   const primaryHasPages = primaryVersion?.hasPages;
 
@@ -206,7 +207,7 @@ export default function DataroomDocumentCard({
         <div
           className={cn(
             "flex items-center justify-between p-3 sm:p-4",
-            isProcessing && "opacity-60",
+            isProcessing && !processingDisabled && "opacity-60",
           )}
         >
           <div className="flex min-w-0 shrink items-center space-x-2 sm:space-x-4">
@@ -339,7 +340,7 @@ export default function DataroomDocumentCard({
           </div>
         </div>
 
-        { !DISABLE_DOCUMENT_PROCESSING &&
+        { !processingDisabled &&
           ["pdf", "docs", "slides", "cad"].includes(
             dataroomDocument.document.type,
           ) &&
