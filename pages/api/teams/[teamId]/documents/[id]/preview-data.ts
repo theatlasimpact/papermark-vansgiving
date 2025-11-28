@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 
 import { getFile } from "@/lib/files/get-file";
+import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
@@ -140,15 +141,24 @@ export default async function handle(
         primaryVersion.type || "",
       );
 
-      if (shouldHavePages) {
+      if (shouldHavePages && !DISABLE_DOCUMENT_PROCESSING) {
         return res.status(400).json({
           message: "Document is still processing. Please wait and try again.",
         });
-      } else {
-        return res.status(400).json({
-          message: "Preview not available for this document type",
-        });
       }
+
+      if (shouldHavePages && DISABLE_DOCUMENT_PROCESSING) {
+        returnData.file = await getFile({
+          data: primaryVersion.file,
+          type: primaryVersion.storageType,
+        });
+        returnData.numPages = returnData.numPages || 1;
+        return res.status(200).json(returnData);
+      }
+
+      return res.status(400).json({
+        message: "Preview not available for this document type",
+      });
     }
 
     return res.status(200).json(returnData);

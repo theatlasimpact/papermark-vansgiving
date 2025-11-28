@@ -18,6 +18,7 @@ import { mutate } from "swr";
 
 import { type DataroomFolderDocument } from "@/lib/swr/use-dataroom";
 import { type DocumentWithLinksAndLinkCountAndViewCount } from "@/lib/types";
+import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
 import { cn, nFormatter, timeAgo } from "@/lib/utils";
 import { fileIcon } from "@/lib/utils/get-file-icon";
 import {
@@ -82,6 +83,10 @@ export default function DataroomDocumentCard({
 
   // Add state for document processing status
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const primaryVersion = dataroomDocument.document.versions?.[0];
+  const primaryVersionId = primaryVersion?.id;
+  const primaryHasPages = primaryVersion?.hasPages;
 
   // https://github.com/radix-ui/primitives/issues/1241#issuecomment-1888232392
   useEffect(() => {
@@ -264,8 +269,7 @@ export default function DataroomDocumentCard({
             <DocumentPreviewButton
               documentId={dataroomDocument.document.id}
               primaryVersion={{
-                hasPages:
-                  dataroomDocument.document.versions?.[0]?.hasPages || false,
+                hasPages: primaryHasPages || false,
                 type: dataroomDocument.document.type,
                 numPages: null, // Not available in this context
               }}
@@ -335,13 +339,14 @@ export default function DataroomDocumentCard({
           </div>
         </div>
 
-        {["pdf", "docs", "slides", "cad"].includes(
-          dataroomDocument.document.type,
-        ) &&
-          !dataroomDocument.document.versions?.[0]?.hasPages &&
-          dataroomDocument.document.versions?.[0]?.id && (
+        { !DISABLE_DOCUMENT_PROCESSING &&
+          ["pdf", "docs", "slides", "cad"].includes(
+            dataroomDocument.document.type,
+          ) &&
+          !primaryHasPages &&
+          primaryVersionId && (
             <FileProcessStatusBar
-              documentVersionId={dataroomDocument.document.versions[0].id}
+              documentVersionId={primaryVersionId as string}
               className="rounded-b-lg border-t border-gray-200 dark:border-gray-700"
               mutateDocument={() => {
                 setIsProcessing(false);
