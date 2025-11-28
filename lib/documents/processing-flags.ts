@@ -1,0 +1,3 @@
+export const DISABLE_DOCUMENT_PROCESSING =
+  process.env.NEXT_PUBLIC_DISABLE_DOCUMENT_PROCESSING === "true" ||
+  process.env.DISABLE_DOCUMENT_PROCESSING === "true";

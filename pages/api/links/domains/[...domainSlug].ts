@@ -116,6 +116,10 @@ export default async function handle(
         });
       }
 
+      console.info(
+        `[custom-domain] host=${domain} path=${slug} linkId=${link.id}`,
+      );
+
       if (link.isArchived) {
         return res.status(404).json({
           error: "Link is archived",

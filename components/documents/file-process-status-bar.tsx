@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import useSWRImmutable from "swr/immutable";
 
 import { Progress } from "@/components/ui/progress";
-
 import type { DocumentProcessingStatus } from "@/lib/documents/document-processing-types";
+import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
 import { cn, fetcher } from "@/lib/utils";
 import { useDocumentProgressStatus } from "@/lib/utils/use-progress-status";
 
@@ -31,29 +31,48 @@ export default function FileProcessStatusBar({
   mutateDocument?: () => void;
   onProcessingChange?: (processing: boolean) => void;
 }) {
+  const processingDisabled = DISABLE_DOCUMENT_PROCESSING;
   const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    if (processingDisabled && onProcessingChange) {
+      onProcessingChange(false);
+    }
+  }, [processingDisabled, onProcessingChange]);
+
   const { data } = useSWRImmutable<ProgressTokenResponse>(
     `/api/progress-token?documentVersionId=${documentVersionId}`,
     fetcher,
+    {
+      isPaused: () => processingDisabled,
+    },
   );
 
   const { status: progressStatus, error: progressError } =
     useDocumentProgressStatus(
       documentVersionId,
-      data?.publicAccessToken,
-      data?.processingStatus,
+      processingDisabled ? null : data?.publicAccessToken,
+      processingDisabled
+        ? { state: "READY", message: "", terminal: true }
+        : data?.processingStatus,
     );
 
+  const resolvedStatus = useMemo(() => {
+    if (processingDisabled) {
+      return { state: "COMPLETED", progress: 100, text: "" };
+    }
+    return progressStatus;
+  }, [processingDisabled, progressStatus]);
+
   useEffect(() => {
-    if (!onProcessingChange) return;
+    if (!onProcessingChange || processingDisabled) return;
     onProcessingChange(
-      progressStatus.state === "QUEUED" ||
-        progressStatus.state === "EXECUTING",
+      resolvedStatus.state === "QUEUED" || resolvedStatus.state === "EXECUTING",
     );
-  }, [progressStatus.state, onProcessingChange]);
+  }, [resolvedStatus.state, onProcessingChange, processingDisabled]);
 
   useEffect(() => {
-    if (progressStatus.state !== "QUEUED") {
+    if (resolvedStatus.state !== "QUEUED") {
       return;
     }
 
@@ -64,19 +83,19 @@ export default function FileProcessStatusBar({
     return () => {
       clearInterval(interval);
     };
-  }, [progressStatus.state]);
+  }, [resolvedStatus.state]);
 
   useEffect(() => {
-    if (progressStatus.state === "COMPLETED") {
+    if (resolvedStatus.state === "COMPLETED" && !processingDisabled) {
       mutateDocument?.();
     }
-  }, [progressStatus.state, mutateDocument]);
+  }, [resolvedStatus.state, mutateDocument, processingDisabled]);
 
-  if (progressStatus.state === "COMPLETED") {
+  if (processingDisabled || resolvedStatus.state === "COMPLETED") {
     return null;
   }
 
-  if (progressStatus.state === "QUEUED" && !progressError) {
+  if (resolvedStatus.state === "QUEUED" && !progressError) {
     return (
       <Progress
         value={0}
@@ -92,7 +111,7 @@ export default function FileProcessStatusBar({
   if (
     progressError ||
     ["FAILED", "CRASHED", "CANCELED", "SYSTEM_FAILURE"].includes(
-      progressStatus.state,
+      resolvedStatus.state,
     )
   ) {
     return (
@@ -100,7 +119,7 @@ export default function FileProcessStatusBar({
         value={0}
         text={
           progressError?.message ||
-          progressStatus.text ||
+          resolvedStatus.text ||
           "Error processing document"
         }
         error={true}
@@ -114,8 +133,8 @@ export default function FileProcessStatusBar({
 
   return (
     <Progress
-      value={progressStatus.progress || 0}
-      text={progressStatus.text || "Processing document..."}
+      value={resolvedStatus.progress || 0}
+      text={resolvedStatus.text || "Processing document..."}
       className={cn("w-full rounded-none text-[8px] font-semibold", className)}
     />
   );

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import React from "react";
 
-import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { EyeIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { ButtonTooltip } from "@/components/ui/tooltip";
+import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
 
+import { ButtonTooltip } from "../ui/tooltip";
+import { Button } from "../ui/button";
 import { DocumentPreviewModal } from "./document-preview-modal";
 
 interface DocumentPreviewButtonProps {
@@ -15,7 +16,7 @@ interface DocumentPreviewButtonProps {
     numPages?: number | null;
   };
   isProcessing?: boolean;
-  variant?: "ghost" | "outline" | "default";
+  variant?: "ghost" | "outline" | "default" | "secondary";
   size?: "sm" | "default" | "lg" | "icon";
   children?: React.ReactNode;
   className?: string;
@@ -32,32 +33,36 @@ export function DocumentPreviewButton({
   className,
   showTooltip = true,
 }: DocumentPreviewButtonProps) {
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
 
-  // Check if document type supports preview
+  const derivedProcessing =
+    !DISABLE_DOCUMENT_PROCESSING &&
+    (isProcessing ||
+      (!!primaryVersion &&
+        ["pdf", "docs", "slides", "cad"].includes(
+          primaryVersion.type || "",
+        ) &&
+        !primaryVersion.hasPages));
+
   const supportsPreview = () => {
-    if (!primaryVersion) return false;
-
-    // Support documents with pages (PDFs, docs, slides, etc.)
+    if (!primaryVersion) return true;
+    if (DISABLE_DOCUMENT_PROCESSING) return true;
     if (primaryVersion.hasPages) return true;
-
-    // Support image documents
     if (primaryVersion.type === "image") return true;
-
-    // Don't support sheets, notion, videos, etc.
     return false;
   };
 
-  // Don't render if document type doesn't support preview
   if (!supportsPreview()) {
     return null;
   }
 
-  const handlePreviewClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handlePreviewClick = (
+    e?: React.MouseEvent<HTMLButtonElement, MouseEvent>,
+  ) => {
+    e?.stopPropagation();
+    e?.preventDefault();
 
-    if (isProcessing) return;
+    if (derivedProcessing) return;
     setIsPreviewOpen(true);
   };
 
@@ -66,7 +71,7 @@ export function DocumentPreviewButton({
       variant={variant}
       size={size}
       onClick={handlePreviewClick}
-      disabled={isProcessing}
+      disabled={derivedProcessing}
       className={className}
     >
       {children || (
@@ -81,7 +86,7 @@ export function DocumentPreviewButton({
   const wrappedButton = showTooltip ? (
     <ButtonTooltip
       content={
-        isProcessing
+        derivedProcessing
           ? "Document is still processing"
           : "Quick preview of document"
       }
@@ -104,15 +109,17 @@ export function DocumentPreviewButton({
   );
 }
 
+export default DocumentPreviewButton;
+
 // Helper function to check if document is processing
 export function isDocumentProcessing(primaryVersion?: {
   hasPages?: boolean;
   type?: string | null;
   numPages?: number | null;
 }) {
+  if (DISABLE_DOCUMENT_PROCESSING) return false;
   if (!primaryVersion) return false;
 
-  // Check if document type should have pages but doesn't
   const shouldHavePages = ["pdf", "docs", "slides", "cad"].includes(
     primaryVersion.type || "",
   );
