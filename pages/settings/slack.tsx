@@ -7,6 +7,7 @@ import { CircleHelpIcon, Hash, Settings, XCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAnalytics } from "@/lib/analytics";
+import { slackIntegrationEnabled } from "@/lib/integrations/slack/flags";
 import {
   SlackChannelConfig,
   SlackIntegration,
@@ -39,6 +40,7 @@ export default function SlackSettings() {
   const teamInfo = useTeam();
   const teamId = teamInfo?.currentTeam?.id;
   const [connecting, setConnecting] = useState(false);
+  const slackEnabled = slackIntegrationEnabled;
   const [isChannelPopoverOpen, setIsChannelPopoverOpen] = useState(false);
   const [pendingChannelUpdate, setPendingChannelUpdate] = useState(false);
   const analytics = useAnalytics();
@@ -50,7 +52,7 @@ export default function SlackSettings() {
     loading: loadingIntegration,
     mutate: mutateIntegration,
   } = useSlackIntegration({
-    enabled: !!teamId,
+    enabled: slackEnabled && !!teamId,
   });
 
   const {
@@ -59,7 +61,7 @@ export default function SlackSettings() {
     error: channelsError,
     mutate: mutateChannels,
   } = useSlackChannels({
-    enabled: !!integration,
+    enabled: slackEnabled && !!integration,
   });
 
   const ChannelIcon = useMemo(
@@ -88,8 +90,35 @@ export default function SlackSettings() {
     [filteredChannels, ChannelIcon],
   );
 
+  if (!slackEnabled) {
+    return (
+      <AppLayout>
+        <SettingsHeader />
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Slack integration unavailable</CardTitle>
+            <CardDescription>
+              Configure Slack environment variables to enable this integration.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Slack support is disabled for this deployment. Add the required Slack
+              credentials and set NEXT_PUBLIC_SLACK_ENABLED to true to turn it on.
+            </p>
+          </CardContent>
+        </Card>
+      </AppLayout>
+    );
+  }
+
+
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;
+
+    if (!slackEnabled) {
+      return () => undefined;
+    }
 
     if (router.query.success) {
       toast.success("Slack integration connected successfully!");
@@ -126,7 +155,7 @@ export default function SlackSettings() {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [router.query, mutateIntegration, analytics, teamId]);
+  }, [router.query, mutateIntegration, analytics, teamId, slackEnabled]);
 
   const handleConnect = async () => {
     if (!teamId) return;

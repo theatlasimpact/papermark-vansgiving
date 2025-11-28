@@ -4,7 +4,7 @@ import useSWRImmutable from "swr/immutable";
 
 import { Progress } from "@/components/ui/progress";
 import type { DocumentProcessingStatus } from "@/lib/documents/document-processing-types";
-import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
+import { isDocumentProcessingDisabled } from "@/lib/documents/processing-flags";
 import { cn, fetcher } from "@/lib/utils";
 import { useDocumentProgressStatus } from "@/lib/utils/use-progress-status";
 
@@ -31,7 +31,7 @@ export default function FileProcessStatusBar({
   mutateDocument?: () => void;
   onProcessingChange?: (processing: boolean) => void;
 }) {
-  const processingDisabled = DISABLE_DOCUMENT_PROCESSING;
+  const processingDisabled = isDocumentProcessingDisabled;
   const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {
@@ -39,6 +39,10 @@ export default function FileProcessStatusBar({
       onProcessingChange(false);
     }
   }, [processingDisabled, onProcessingChange]);
+
+  if (processingDisabled) {
+    return null;
+  }
 
   const { data } = useSWRImmutable<ProgressTokenResponse>(
     `/api/progress-token?documentVersionId=${documentVersionId}`,

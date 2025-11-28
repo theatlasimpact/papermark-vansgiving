@@ -1,14 +1,17 @@
 import { useTeam } from "@/context/team-context";
-import useSWR from "swr";
 import useSWRImmutable from "swr/immutable";
 
+import { slackIntegrationEnabled } from "@/lib/integrations/slack/flags";
 import { SlackIntegration } from "@/lib/integrations/slack/types";
 import { fetcher } from "@/lib/utils";
 
 export function useSlackIntegration({ enabled = true }: { enabled?: boolean }) {
   const { currentTeamId: teamId } = useTeam();
+  const slackEnabled = slackIntegrationEnabled;
   const { data, error, isLoading, mutate } = useSWRImmutable<SlackIntegration>(
-    enabled && teamId ? `/api/teams/${teamId}/integrations/slack` : null,
+    enabled && slackEnabled && teamId
+      ? `/api/teams/${teamId}/integrations/slack`
+      : null,
     fetcher,
     {
       revalidateOnFocus: false,

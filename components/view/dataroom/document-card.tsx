@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { timeAgo } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { isDocumentProcessingDisabled } from "@/lib/documents/processing-flags";
 import { fileIcon } from "@/lib/utils/get-file-icon";
 import {
   HIERARCHICAL_DISPLAY_STYLE,
@@ -57,6 +58,8 @@ export default function DocumentCard({
   const { theme, systemTheme } = useTheme();
   const canDownload = document.canDownload && allowDownload;
 
+  const processingDisabled = isDocumentProcessingDisabled;
+
   const isLight =
     theme === "light" || (theme === "system" && systemTheme === "light");
   const router = useRouter();
@@ -74,7 +77,7 @@ export default function DocumentCard({
   };
 
   const handleDocumentClick = (e: React.MouseEvent) => {
-    if (isProcessing) {
+    if (isProcessing && !processingDisabled) {
       e.preventDefault();
       toast.error(
         "Document is still processing. Please wait a moment and try again.",
@@ -186,7 +189,7 @@ export default function DocumentCard({
     <div
       className={cn(
         "group/row relative flex items-center justify-between rounded-lg border-0 p-3 ring-1 ring-gray-200 transition-all hover:bg-secondary hover:ring-gray-300 dark:bg-secondary dark:ring-gray-700 hover:dark:ring-gray-500 sm:p-4",
-        isProcessing && "cursor-not-allowed opacity-60",
+        isProcessing && !processingDisabled && "cursor-not-allowed opacity-60",
       )}
     >
       <div className="z-0 flex min-w-0 shrink items-center space-x-2 sm:space-x-4">

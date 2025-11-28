@@ -12,7 +12,7 @@ import {
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { PanelLeftIcon, XIcon } from "lucide-react";
 
-import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
+import { isDocumentProcessingDisabled } from "@/lib/documents/processing-flags";
 import { cn } from "@/lib/utils";
 import {
   HIERARCHICAL_DISPLAY_STYLE,
@@ -333,10 +333,12 @@ export default function DataroomViewer({
     searchQuery,
   ]);
 
+  const processingDisabled = isDocumentProcessingDisabled;
+
   const renderItem = (item: FolderOrDocument) => {
     if ("versions" in item) {
       const isProcessing =
-        !DISABLE_DOCUMENT_PROCESSING &&
+        !processingDisabled &&
         ["docs", "slides", "pdf"].includes(item.versions[0].type) &&
         !item.versions[0].hasPages;
 

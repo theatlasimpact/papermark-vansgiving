@@ -3,7 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 
 import { getFile } from "@/lib/files/get-file";
-import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
+import { isDocumentProcessingDisabled } from "@/lib/documents/processing-flags";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
@@ -29,6 +29,8 @@ export default async function handle(
     teamId: string;
   };
   const userId = (session.user as CustomUser).id;
+
+  const processingDisabled = isDocumentProcessingDisabled;
 
   try {
     const team = await prisma.team.findUnique({
@@ -141,13 +143,13 @@ export default async function handle(
         primaryVersion.type || "",
       );
 
-      if (shouldHavePages && !DISABLE_DOCUMENT_PROCESSING) {
+      if (shouldHavePages && !processingDisabled) {
         return res.status(400).json({
           message: "Document is still processing. Please wait and try again.",
         });
       }
 
-      if (shouldHavePages && DISABLE_DOCUMENT_PROCESSING) {
+      if (shouldHavePages && processingDisabled) {
         returnData.file = await getFile({
           data: primaryVersion.file,
           type: primaryVersion.storageType,

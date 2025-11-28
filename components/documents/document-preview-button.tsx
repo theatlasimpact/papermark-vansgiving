@@ -2,7 +2,7 @@ import React from "react";
 
 import { EyeIcon } from "lucide-react";
 
-import { DISABLE_DOCUMENT_PROCESSING } from "@/lib/documents/processing-flags";
+import { isDocumentProcessingDisabled } from "@/lib/documents/processing-flags";
 
 import { ButtonTooltip } from "../ui/tooltip";
 import { Button } from "../ui/button";
@@ -34,9 +34,10 @@ export function DocumentPreviewButton({
   showTooltip = true,
 }: DocumentPreviewButtonProps) {
   const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
+  const processingDisabled = isDocumentProcessingDisabled;
 
   const derivedProcessing =
-    !DISABLE_DOCUMENT_PROCESSING &&
+    !processingDisabled &&
     (isProcessing ||
       (!!primaryVersion &&
         ["pdf", "docs", "slides", "cad"].includes(
@@ -46,7 +47,7 @@ export function DocumentPreviewButton({
 
   const supportsPreview = () => {
     if (!primaryVersion) return true;
-    if (DISABLE_DOCUMENT_PROCESSING) return true;
+    if (processingDisabled) return true;
     if (primaryVersion.hasPages) return true;
     if (primaryVersion.type === "image") return true;
     return false;
@@ -86,9 +87,7 @@ export function DocumentPreviewButton({
   const wrappedButton = showTooltip ? (
     <ButtonTooltip
       content={
-        derivedProcessing
-          ? "Document is still processing"
-          : "Quick preview of document"
+        derivedProcessing ? "Preview will be ready soon" : "Quick preview of document"
       }
     >
       {button}
@@ -117,7 +116,7 @@ export function isDocumentProcessing(primaryVersion?: {
   type?: string | null;
   numPages?: number | null;
 }) {
-  if (DISABLE_DOCUMENT_PROCESSING) return false;
+  if (isDocumentProcessingDisabled) return false;
   if (!primaryVersion) return false;
 
   const shouldHavePages = ["pdf", "docs", "slides", "cad"].includes(
