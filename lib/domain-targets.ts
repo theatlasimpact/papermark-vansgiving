@@ -30,14 +30,24 @@ export async function matchesAllowedCname(
     return false;
   }
 
-  try {
-    const records = await dns.resolveCname(domain);
-    return records.some((record) =>
-      cnameRecordMatches(record, acceptableCnameTargets),
-    );
-  } catch (error) {
+  const normalizedDomain = normalizeHostname(domain);
+  if (!normalizedDomain) {
     return false;
   }
+
+  const hostnames = new Set<string>([
+    normalizedDomain,
+    `www.${normalizedDomain}`,
+  ]);
+
+  for (const hostname of hostnames) {
+    const matches = await resolveCnameMatches(hostname, acceptableCnameTargets);
+    if (matches) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function matchesVercelIp(domain: string) {
@@ -97,5 +107,19 @@ function extractHostname(url?: string | null) {
 
 function normalizeHostname(hostname?: string | null) {
   if (!hostname) return undefined;
-  return hostname.toLowerCase().replace(/\.$/, "");
+  return hostname.trim().toLowerCase().replace(/\.$/, "");
+}
+
+async function resolveCnameMatches(
+  hostname: string,
+  allowedTargets: Set<string>,
+) {
+  try {
+    const records = await dns.resolveCname(hostname);
+    return records.some((record) =>
+      cnameRecordMatches(record, allowedTargets),
+    );
+  } catch (error) {
+    return false;
+  }
 }
