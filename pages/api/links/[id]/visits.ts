@@ -6,7 +6,6 @@ import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { teamHasFeature } from "@/lib/plan/guards";
-import { getDocumentWithTeamAndUser } from "@/lib/team/helper";
 import { getViewPageDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
@@ -40,6 +39,7 @@ export default async function handle(
           document: {
             select: {
               id: true,
+              ownerId: true,
               numPages: true,
               versions: {
                 where: { isPrimary: true },
@@ -51,6 +51,11 @@ export default async function handle(
                 select: {
                   id: true,
                   plan: true,
+                  users: {
+                    select: {
+                      userId: true,
+                    },
+                  },
                 },
               },
             },
@@ -65,22 +70,15 @@ export default async function handle(
 
       const docId = result.document.id;
 
-      // check if the the team that own the document has the current user
-      await getDocumentWithTeamAndUser({
-        docId,
-        userId,
-        options: {
-          team: {
-            select: {
-              users: {
-                select: {
-                  userId: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      // authorize: allow document owners or team members
+      const isOwner = result.document.ownerId === userId;
+      const isTeamMember = result.document.team?.users.some(
+        (user) => user.userId === userId,
+      );
+
+      if (!isOwner && !isTeamMember) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
 
       const numPages =
         result?.document?.versions[0]?.numPages ||
@@ -134,8 +132,6 @@ export default async function handle(
           completionRate: completionRate.toFixed(),
         };
       });
-
-      // TODO: Check that the user is owner of the links, otherwise return 401
 
       return res.status(200).json(viewsWithDuration);
     } catch (error) {
