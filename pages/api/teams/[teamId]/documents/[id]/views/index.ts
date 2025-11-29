@@ -242,6 +242,14 @@ export default async function handle(
         return res.status(404).end("Document not found");
       }
 
+      const isAuthorized =
+        document.ownerId === userId ||
+        document.team?.users.some((teamUser) => teamUser.userId === userId);
+
+      if (!isAuthorized) {
+        return res.status(401).end("Unauthorized");
+      }
+
       // Check if document has any views first to avoid expensive query
       const viewCount = await prisma.view.count({
         where: {
