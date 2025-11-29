@@ -27,6 +27,9 @@ type Document = {
   numPages: number | null;
   type: string | null;
   ownerId: string | null;
+  team?: {
+    users: { userId: string }[];
+  };
   _count: {
     views: number;
   };
@@ -208,6 +211,15 @@ export default async function handle(
           ownerId: true,
           numPages: true,
           type: true,
+          team: {
+            select: {
+              users: {
+                select: {
+                  userId: true,
+                },
+              },
+            },
+          },
           versions: {
             orderBy: { createdAt: "desc" },
             select: {
