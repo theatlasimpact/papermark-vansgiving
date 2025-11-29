@@ -49,7 +49,6 @@ export default async function handle(
               },
               team: {
                 select: {
-                  id: true,
                   plan: true,
                   users: {
                     select: {
