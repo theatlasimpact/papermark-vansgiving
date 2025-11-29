@@ -250,22 +250,6 @@ export default async function handle(
         return res.status(401).end("Unauthorized");
       }
 
-      // Check if document has any views first to avoid expensive query
-      const viewCount = await prisma.view.count({
-        where: {
-          documentId: docId,
-          isArchived: false,
-        },
-      });
-
-      if (viewCount === 0) {
-        return res.status(200).json({
-          viewsWithDuration: [],
-          hiddenViewCount: 0,
-          totalViews: 0,
-        });
-      }
-
       const views = await prisma.view.findMany({
         skip: offset,
         take: limit,
