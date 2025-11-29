@@ -57,6 +57,15 @@ export default async function handle(
           teamId: true,
           numPages: true,
           type: true,
+          team: {
+            select: {
+              users: {
+                select: {
+                  userId: true,
+                },
+              },
+            },
+          },
           versions: {
             orderBy: { createdAt: "desc" },
             select: {
