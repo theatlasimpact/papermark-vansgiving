@@ -97,16 +97,6 @@ export default async function handle(
         return res.status(403).end("Unauthorized");
       }
 
-      if (document._count.views === 0) {
-        return res.status(200).json({
-          views: [],
-          duration: { data: [] },
-          total_duration: 0,
-          avgCompletionRate: 0,
-          totalViews: 0,
-        });
-      }
-
       const [views, users] = await Promise.all([
         prisma.view.findMany({
           where: {
@@ -147,6 +137,16 @@ export default async function handle(
         (view) => !allExcludedViews.map((view) => view.id).includes(view.id),
       );
 
+      if (filteredViews.length === 0) {
+        return res.status(200).json({
+          views: [],
+          duration: { data: [] },
+          total_duration: 0,
+          avgCompletionRate: 0,
+          totalViews: 0,
+        });
+      }
+
       const [duration, totalDocumentDuration] = await Promise.all([
         getTotalAvgPageDuration({
           documentId: docId,
@@ -161,6 +161,22 @@ export default async function handle(
           since: 0,
         }),
       ]);
+
+      const durationWithMs = {
+        ...duration,
+        data: duration.data.map((dataPoint) => ({
+          ...dataPoint,
+          // Tinybird returns seconds; convert to milliseconds for UI consumers.
+          avg_duration: dataPoint.avg_duration * 1000,
+        })),
+      };
+
+      let totalDurationAverageMs = 0;
+      if (filteredViews.length > 0) {
+        const totalDuration = totalDocumentDuration.data?.[0]?.sum_duration ?? 0;
+        totalDurationAverageMs =
+          (totalDuration * 1000) / (filteredViews.length || 1);
+      }
 
       let avgCompletionRate = 0;
       if (filteredViews.length > 0) {
@@ -226,12 +242,8 @@ export default async function handle(
 
       const stats = {
         views: filteredViews,
-        duration,
-        total_duration:
-          filteredViews.length > 0
-            ? (totalDocumentDuration.data[0].sum_duration * 1.0) /
-              filteredViews.length
-            : 0,
+        duration: durationWithMs,
+        total_duration: totalDurationAverageMs,
         avgCompletionRate: Math.round(avgCompletionRate),
         totalViews: filteredViews.length,
       };

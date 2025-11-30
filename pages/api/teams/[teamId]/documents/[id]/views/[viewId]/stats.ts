@@ -39,10 +39,14 @@ export default async function handle(
             teamId,
           },
         },
+        select: {
+          status: true,
+          blockedAt: true,
+        },
       });
 
-      if (!teamAccess) {
-        return res.status(401).end("Unauthorized");
+      if (!teamAccess || teamAccess.status !== "ACTIVE" || teamAccess.blockedAt) {
+        return res.status(403).end("Unauthorized");
       }
 
       const document = await prisma.document.findUnique({
@@ -63,12 +67,21 @@ export default async function handle(
         since: 0,
       });
 
-      const total_duration = duration.data.reduce(
+      const normalizedDuration = {
+        ...duration,
+        data: duration.data.map((dataPoint) => ({
+          ...dataPoint,
+          // Tinybird returns seconds; convert to milliseconds for UI consumers.
+          sum_duration: dataPoint.sum_duration * 1000,
+        })),
+      };
+
+      const total_duration = normalizedDuration.data.reduce(
         (totalDuration, data) => totalDuration + data.sum_duration,
         0,
       );
 
-      const stats = { duration, total_duration };
+      const stats = { duration: normalizedDuration, total_duration };
 
       return res.status(200).json(stats);
     } catch (error) {

@@ -94,6 +94,31 @@ export default function VisitorsTable({
     }
   }, [error]);
 
+  const processedViews = useMemo(
+    () =>
+      views?.viewsWithDuration?.map((view) => {
+        const totalDuration = Number(view.totalDuration ?? 0);
+        const completionValue =
+          view.completionPercent ?? view.completionRate ?? 0;
+        const completionRate =
+          typeof completionValue === "string"
+            ? parseFloat(completionValue)
+            : completionValue ?? 0;
+
+        return {
+          ...view,
+          totalDuration,
+          completionRate,
+        };
+      }) ?? [],
+    [views?.viewsWithDuration],
+  );
+
+  const hasViews = useMemo(
+    () => processedViews.length > 0,
+    [processedViews.length],
+  );
+
   const handleArchiveView = async (
     viewId: string,
     targetId: string,
@@ -133,10 +158,6 @@ export default function VisitorsTable({
     setIsArchiving(false);
   };
 
-  const hasViews = useMemo(
-    () => (views?.viewsWithDuration?.length ?? 0) > 0,
-    [views?.viewsWithDuration?.length],
-  );
   const hasHiddenViews = (views?.hiddenViewCount ?? 0) > 0;
   const showEmptyState = !loading && !error && !hasViews && !hasHiddenViews;
   const totalViews = views?.totalViews ?? 0;
@@ -199,7 +220,7 @@ export default function VisitorsTable({
             )}
 
             {!loading && !error && hasViews &&
-              views?.viewsWithDuration?.map((view) => {
+              processedViews.map((view) => {
                 if (view.isArchived) {
                   return (
                     <TableRow

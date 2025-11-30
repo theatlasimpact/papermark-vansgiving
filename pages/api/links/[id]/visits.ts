@@ -49,6 +49,7 @@ export default async function handle(
               },
               team: {
                 select: {
+                  id: true,
                   plan: true,
                   users: {
                     select: {
@@ -67,16 +68,30 @@ export default async function handle(
         return res.status(200).json([]);
       }
 
-      const docId = result.document.id;
-
       // authorize: allow document owners or team members
       const isOwner = result.document.ownerId === userId;
       const isTeamMember = result.document.team?.users.some(
         (user) => user.userId === userId,
       );
 
-      if (!isOwner && !isTeamMember) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const membership = result.document.team
+        ? await prisma.userTeam.findUnique({
+            where: {
+              userId_teamId: {
+                userId,
+                teamId: result.document.team.id,
+              },
+            },
+            select: { status: true, blockedAt: true },
+          })
+        : null;
+
+      const hasActiveMembership =
+        membership?.status === "ACTIVE" && !membership?.blockedAt;
+      const isAuthorized = isOwner || (isTeamMember && hasActiveMembership);
+
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "Unauthorized" });
       }
 
       const numPages =
@@ -109,26 +124,38 @@ export default async function handle(
 
       const durations = await Promise.all(durationsPromises);
 
-      // Sum up durations for each view
-      const summedDurations = durations.map((duration) => {
-        return duration.data.reduce(
+      // Construct the response combining views and their respective durations
+      const viewsWithDuration = limitedViews.map((view, index) => {
+        const normalizedDuration = {
+          ...durations[index],
+          data: durations[index].data.map((dataPoint) => ({
+            ...dataPoint,
+            // Tinybird returns seconds; convert to milliseconds for UI consumers.
+            sum_duration: dataPoint.sum_duration * 1000,
+          })),
+        };
+
+        const totalDurationMs = normalizedDuration.data.reduce(
           (totalDuration, data) => totalDuration + data.sum_duration,
           0,
         );
-      });
 
-      // Construct the response combining views and their respective durations
-      const viewsWithDuration = limitedViews.map((view, index) => {
         // calculate the completion rate
         const completionRate = numPages
-          ? (durations[index].data.length / numPages) * 100
+          ? (normalizedDuration.data.filter((data) => data.sum_duration > 0)
+              .length /
+              numPages) *
+            100
           : 0;
+        const completionPercent = Math.min(100, Math.round(completionRate));
 
         return {
           ...view,
-          duration: durations[index],
-          totalDuration: summedDurations[index],
-          completionRate: completionRate.toFixed(),
+          duration: normalizedDuration,
+          totalDuration: totalDurationMs,
+          durationSeconds: totalDurationMs / 1000,
+          completionRate: completionPercent,
+          completionPercent,
         };
       });
 

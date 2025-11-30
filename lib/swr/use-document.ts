@@ -92,7 +92,9 @@ interface ViewWithDuration extends View {
     data: { pageNumber: string; sum_duration: number }[];
   };
   totalDuration: number;
+  durationSeconds?: number;
   completionRate: number;
+  completionPercent?: number;
   link: {
     name: string | null;
   };
