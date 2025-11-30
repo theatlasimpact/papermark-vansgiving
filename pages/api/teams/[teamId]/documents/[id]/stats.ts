@@ -19,7 +19,6 @@ export default async function handle(
   res: NextApiResponse,
 ) {
   if (req.method === "GET") {
-    // GET /api/teams/:teamId/documents/:id/stats
     const session = await getServerSession(req, res, authOptions);
     if (!session) {
       return res.status(401).end("Unauthorized");
@@ -35,60 +34,69 @@ export default async function handle(
       excludeTeamMembers?: string;
     };
 
+    const excludeMembers = excludeTeamMembers === "true";
     const userId = (session.user as CustomUser).id;
 
     try {
-      const teamHasUser = await prisma.team.findUnique({
-        where: { id: teamId, users: { some: { userId } } },
-      });
-
-      if (!teamHasUser) {
-        return res.status(401).end("Unauthorized");
-      }
-
-      // First check if document exists and get basic info
-      const document = await prisma.document.findUnique({
-        where: {
-          id: docId,
-          teamId,
-        },
-        select: {
-          id: true,
-          teamId: true,
-          numPages: true,
-          type: true,
-          team: {
-            select: {
-              users: {
-                select: {
-                  userId: true,
-                },
+      const [document, membership] = await Promise.all([
+        prisma.document.findUnique({
+          where: {
+            id: docId,
+            teamId,
+          },
+          select: {
+            id: true,
+            teamId: true,
+            numPages: true,
+            type: true,
+            ownerId: true,
+            versions: {
+              orderBy: { createdAt: "desc" },
+              select: {
+                versionNumber: true,
+                createdAt: true,
+                numPages: true,
+                type: true,
+                length: true,
+              },
+            },
+            _count: {
+              select: {
+                views: { where: { isArchived: false } },
               },
             },
           },
-          versions: {
-            orderBy: { createdAt: "desc" },
-            select: {
-              versionNumber: true,
-              createdAt: true,
-              numPages: true,
-              type: true,
-              length: true,
+        }),
+        prisma.userTeam.findUnique({
+          where: {
+            userId_teamId: {
+              userId,
+              teamId,
             },
           },
-          _count: {
-            select: {
-              views: { where: { isArchived: false } },
-            },
+          select: {
+            role: true,
+            status: true,
+            blockedAt: true,
           },
-        },
-      });
+        }),
+      ]);
 
       if (!document) {
         return res.status(404).json({ error: "Document not found" });
       }
 
-      // Early return for documents with no views - avoid expensive queries
+      const hasActiveMembership =
+        membership &&
+        membership.status === "ACTIVE" &&
+        !membership.blockedAt;
+      const isAuthorized =
+        document.ownerId === userId || hasActiveMembership === true;
+
+      if (!isAuthorized) {
+        return res.status(403).end("Unauthorized");
+      }
+
       if (document._count.views === 0) {
         return res.status(200).json({
           views: [],
@@ -99,19 +107,20 @@ export default async function handle(
         });
       }
 
-      // Only fetch views and users if we have views
       const [views, users] = await Promise.all([
         prisma.view.findMany({
           where: {
             documentId: docId,
           },
         }),
-        excludeTeamMembers
+        excludeMembers
           ? prisma.user.findMany({
               where: {
                 teams: {
                   some: {
                     teamId: teamId,
+                    status: "ACTIVE",
+                    blockedAt: null,
                   },
                 },
               },
@@ -125,18 +134,15 @@ export default async function handle(
       const activeViews = views.filter((view) => !view.isArchived);
       const archivedViews = views.filter((view) => view.isArchived);
 
-      // exclude views from the team's members
       let internalViews: View[] = [];
-      if (excludeTeamMembers) {
+      if (excludeMembers) {
         internalViews = activeViews.filter((view) => {
           return users.some((user) => user.email === view.viewerEmail);
         });
       }
 
-      // combined archived and internal views
       const allExcludedViews = [...internalViews, ...archivedViews];
 
-      // filter out the excluded views
       const filteredViews = views.filter(
         (view) => !allExcludedViews.map((view) => view.id).includes(view.id),
       );
@@ -156,11 +162,9 @@ export default async function handle(
         }),
       ]);
 
-      // Calculate average completion rate for all filtered views
       let avgCompletionRate = 0;
       if (filteredViews.length > 0) {
         if (document.type === "video") {
-          // For video documents, calculate based on unique watch time
           const videoEvents = await getVideoEventsByDocument({
             document_id: docId,
           });
@@ -196,7 +200,6 @@ export default async function handle(
             completionRates.reduce((sum, rate) => sum + rate, 0) /
             completionRates.length;
         } else {
-          // For document (PDF) type, calculate based on pages viewed
           const completionRates = await Promise.all(
             filteredViews.map(async (view) => {
               const pageData = await getViewPageDuration({
@@ -225,8 +228,10 @@ export default async function handle(
         views: filteredViews,
         duration,
         total_duration:
-          (totalDocumentDuration.data[0].sum_duration * 1.0) /
-          filteredViews.length,
+          filteredViews.length > 0
+            ? (totalDocumentDuration.data[0].sum_duration * 1.0) /
+              filteredViews.length
+            : 0,
         avgCompletionRate: Math.round(avgCompletionRate),
         totalViews: filteredViews.length,
       };
@@ -236,7 +241,6 @@ export default async function handle(
       errorhandler(error, res);
     }
   } else {
-    // We only allow GET requests
     res.setHeader("Allow", ["GET"]);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }

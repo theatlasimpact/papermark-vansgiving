@@ -72,33 +72,25 @@ async function getVideoViews(
           event.end_time - event.start_time >= 1,
       ) || [];
 
-    // Track timestamps and their frequency for total watch time
     const timestampCounts = new Map<number, number>();
-    // Track unique timestamps for completion calculation
     const uniqueTimestamps = new Set<number>();
 
-    // Calculate total watch time
-    // let totalWatchTime = 0;
     viewEvents.forEach((event) => {
       for (let t = event.start_time; t < event.end_time; t++) {
         const timestamp = Math.floor(t);
-        // Count total occurrences including replays
         timestampCounts.set(
           timestamp,
           (timestampCounts.get(timestamp) || 0) + 1,
         );
-        // Track unique timestamps
         uniqueTimestamps.add(timestamp);
       }
     });
 
-    // Sum up all timestamps including duplicates for total watch time
     let totalWatchTime = 0;
     timestampCounts.forEach((count) => {
       totalWatchTime += count;
     });
 
-    // Get the number of unique timestamps watched
     const uniqueWatchTime = uniqueTimestamps.size;
 
     return {
@@ -125,7 +117,7 @@ async function getVideoViews(
     return {
       ...view,
       duration: durations[index],
-      totalDuration: duration.totalWatchTime * 1000, // convert to milliseconds
+      totalDuration: duration.totalWatchTime * 1000,
       completionRate: completionRate.toFixed(),
       versionNumber: relevantDocumentVersion?.versionNumber || 1,
       versionNumPages: 0,
@@ -188,66 +180,84 @@ export default async function handle(
     const userId = (session.user as CustomUser).id;
 
     try {
-      const team = await prisma.team.findUnique({
-        where: {
-          id: teamId,
-          users: {
-            some: {
-              userId: userId,
+      const [team, document, membership] = await Promise.all([
+        prisma.team.findUnique({
+          where: { id: teamId },
+          select: { plan: true },
+        }),
+        prisma.document.findUnique({
+          where: { id: docId, teamId: teamId },
+          select: {
+            id: true,
+            ownerId: true,
+            numPages: true,
+            type: true,
+            team: {
+              select: {
+                users: {
+                  select: {
+                    userId: true,
+                  },
+                },
+              },
+            },
+            versions: {
+              orderBy: { createdAt: "desc" },
+              select: {
+                versionNumber: true,
+                createdAt: true,
+                numPages: true,
+                type: true,
+                length: true,
+              },
+            },
+            _count: {
+              select: {
+                views: true,
+              },
             },
           },
-        },
-        select: { plan: true },
-      });
+        }),
+        prisma.userTeam.findUnique({
+          where: {
+            userId_teamId: {
+              userId,
+              teamId,
+            },
+          },
+          select: {
+            role: true,
+            status: true,
+            blockedAt: true,
+          },
+        }),
+      ]);
 
       if (!team) {
         return res.status(404).end("Team not found");
       }
 
-      const document = await prisma.document.findUnique({
-        where: { id: docId, teamId: teamId },
-        select: {
-          id: true,
-          ownerId: true,
-          numPages: true,
-          type: true,
-          team: {
-            select: {
-              users: {
-                select: {
-                  userId: true,
-                },
-              },
-            },
-          },
-          versions: {
-            orderBy: { createdAt: "desc" },
-            select: {
-              versionNumber: true,
-              createdAt: true,
-              numPages: true,
-              type: true,
-              length: true,
-            },
-          },
-          _count: {
-            select: {
-              views: true,
-            },
-          },
-        },
-      });
-
       if (!document) {
         return res.status(404).end("Document not found");
       }
 
+      const hasActiveMembership =
+        membership &&
+        membership.status === "ACTIVE" &&
+        !membership.blockedAt;
       const isAuthorized =
-        document.ownerId === userId ||
-        document.team?.users.some((teamUser) => teamUser.userId === userId);
+        document.ownerId === userId || hasActiveMembership === true;
 
       if (!isAuthorized) {
-        return res.status(401).end("Unauthorized");
+        return res.status(403).end("Unauthorized");
+      }
+
+      if (document._count.views === 0) {
+        return res.status(200).json({
+          viewsWithDuration: [],
+          hiddenViewCount: 0,
+          totalViews: 0,
+        });
       }
 
       const views = await prisma.view.findMany({
@@ -285,15 +295,13 @@ export default async function handle(
         },
       });
 
-      if (!views) {
-        return res.status(404).end("Document has no views");
-      }
-
       const users = await prisma.user.findMany({
         where: {
           teams: {
             some: {
               teamId: teamId,
+              status: "ACTIVE",
+              blockedAt: null,
             },
           },
         },
@@ -302,33 +310,54 @@ export default async function handle(
         },
       });
 
-      // filter the last 20 views
       const limitedViews =
         team.plan === "free" && offset >= LIMITS.views ? [] : views;
 
       let viewsWithDuration;
-      if (document.type === "video") {
-        const videoEvents = await getVideoEventsByDocument({
-          document_id: docId,
+      try {
+        if (document.type === "video") {
+          const videoEvents = await getVideoEventsByDocument({
+            document_id: docId,
+          });
+          viewsWithDuration = await getVideoViews(
+            limitedViews,
+            document,
+            videoEvents,
+          );
+        } else {
+          viewsWithDuration = await getDocumentViews(limitedViews, document);
+        }
+      } catch (durationError) {
+        await log({
+          message: `Failed to load view durations for document ${docId}: ${durationError}`,
+          type: "error",
         });
-        viewsWithDuration = await getVideoViews(
-          limitedViews,
-          document,
-          videoEvents,
-        );
-      } else {
-        viewsWithDuration = await getDocumentViews(limitedViews, document);
+        viewsWithDuration = limitedViews.map((view) => {
+          const relevantDocumentVersion = document.versions.find(
+            (version) => version.createdAt <= view.viewedAt,
+          );
+          const numPages =
+            relevantDocumentVersion?.numPages || document.numPages || 0;
+
+          return {
+            ...view,
+            duration: { data: [] },
+            totalDuration: 0,
+            completionRate: 0,
+            versionNumber: relevantDocumentVersion?.versionNumber || 1,
+            versionNumPages: numPages,
+          };
+        });
       }
 
-      // Add internal flag to all views
-      viewsWithDuration = viewsWithDuration.map((view) => ({
+      viewsWithDuration = viewsWithDuration.map((view: any) => ({
         ...view,
         internal: users.some((user) => user.email === view.viewerEmail),
       }));
 
       return res.status(200).json({
         viewsWithDuration,
-        hiddenViewCount: views.length - limitedViews.length,
+        hiddenViewCount: Math.max(views.length - limitedViews.length, 0),
         totalViews: document._count.views || 0,
       });
     } catch (error) {
