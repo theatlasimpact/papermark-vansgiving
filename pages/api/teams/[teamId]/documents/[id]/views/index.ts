@@ -114,11 +114,16 @@ async function getVideoViews(
         ? Math.min(100, (duration.uniqueWatchTime / duration.videoLength) * 100)
         : 0;
 
+    const completionPercent = Math.round(completionRate);
+    const totalDurationMs = duration.totalWatchTime * 1000;
+
     return {
       ...view,
       duration: durations[index],
-      totalDuration: duration.totalWatchTime * 1000,
-      completionRate: completionRate.toFixed(),
+      totalDuration: totalDurationMs,
+      durationSeconds: duration.totalWatchTime,
+      completionRate: completionPercent,
+      completionPercent,
       versionNumber: relevantDocumentVersion?.versionNumber || 1,
       versionNumPages: 0,
     };
@@ -143,19 +148,37 @@ async function getDocumentViews(views: ViewWithExtras[], document: Document) {
 
     const numPages =
       relevantDocumentVersion?.numPages || document.numPages || 0;
+    const rawDuration = durations[index];
+
+    const normalizedDuration = {
+      ...rawDuration,
+      data: rawDuration.data.map((dataPoint) => ({
+        ...dataPoint,
+        // Tinybird returns seconds; convert to milliseconds for UI consumers.
+        sum_duration: dataPoint.sum_duration * 1000,
+      })),
+    };
+
+    const totalDurationMs = normalizedDuration.data.reduce(
+      (total: number, data: { sum_duration: number }) =>
+        total + data.sum_duration,
+      0,
+    );
+
     const completionRate = numPages
-      ? (durations[index].data.length / numPages) * 100
+      ? (normalizedDuration.data.filter((data) => data.sum_duration > 0).length /
+          numPages) *
+        100
       : 0;
+    const completionPercent = Math.min(100, Math.round(completionRate));
 
     return {
       ...view,
-      duration: durations[index],
-      totalDuration: durations[index].data.reduce(
-        (total: number, data: { sum_duration: number }) =>
-          total + data.sum_duration,
-        0,
-      ),
-      completionRate: completionRate.toFixed(),
+      duration: normalizedDuration,
+      totalDuration: totalDurationMs,
+      durationSeconds: totalDurationMs / 1000,
+      completionRate: completionPercent,
+      completionPercent,
       versionNumber: relevantDocumentVersion?.versionNumber || 1,
       versionNumPages: numPages,
     };
@@ -252,14 +275,6 @@ export default async function handle(
         return res.status(403).end("Unauthorized");
       }
 
-      if (document._count.views === 0) {
-        return res.status(200).json({
-          viewsWithDuration: [],
-          hiddenViewCount: 0,
-          totalViews: 0,
-        });
-      }
-
       const views = await prisma.view.findMany({
         skip: offset,
         take: limit,
@@ -294,6 +309,14 @@ export default async function handle(
           },
         },
       });
+
+      if (!views || views.length === 0) {
+        return res.status(200).json({
+          viewsWithDuration: [],
+          hiddenViewCount: 0,
+          totalViews: 0,
+        });
+      }
 
       const users = await prisma.user.findMany({
         where: {
@@ -343,7 +366,9 @@ export default async function handle(
             ...view,
             duration: { data: [] },
             totalDuration: 0,
+            durationSeconds: 0,
             completionRate: 0,
+            completionPercent: 0,
             versionNumber: relevantDocumentVersion?.versionNumber || 1,
             versionNumPages: numPages,
           };
