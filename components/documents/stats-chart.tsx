@@ -3,7 +3,6 @@ import ErrorPage from "next/error";
 import { TStatsData } from "@/lib/swr/use-stats";
 
 import BarChartComponent from "../charts/bar-chart";
-import StatsChartDummy from "./stats-chart-dummy";
 import StatsChartSkeleton from "./stats-chart-skeleton";
 
 export default function StatsChart({
@@ -25,45 +24,37 @@ export default function StatsChart({
     return <StatsChartSkeleton className="my-8" />;
   }
 
-  let durationData = Array.from({ length: totalPagesMax }, (_, i) => ({
-    pageNumber: (i + 1).toString(),
-    data: [
-      {
-        versionNumber: 1,
-        avg_duration: 0,
-      },
-    ],
-  }));
+  const analyticsEnabled = stats?.analyticsEnabled ?? true;
 
-  const swrData = stats?.duration;
-
-  if (swrData) {
-    swrData.data.forEach((dataItem) => {
-      const pageIndex = durationData.findIndex(
+  const durationData = (stats?.duration?.data ?? []).reduce(
+    (
+      acc: {
+        pageNumber: string;
+        data: { versionNumber: number; avg_duration: number }[];
+      }[],
+      dataItem,
+    ) => {
+      const pageIndex = acc.findIndex(
         (item) => item.pageNumber === dataItem.pageNumber,
       );
 
       if (pageIndex !== -1) {
-        // If page exists in the initialized array, update its data
-        const versionIndex = durationData[pageIndex].data.findIndex(
+        const versionIndex = acc[pageIndex].data.findIndex(
           (v) => v.versionNumber === dataItem.versionNumber,
         );
         if (versionIndex === -1) {
-          // If this version number doesn't exist, add it
-          durationData[pageIndex].data.push({
+          acc[pageIndex].data.push({
             versionNumber: dataItem.versionNumber,
             avg_duration: dataItem.avg_duration,
           });
         } else {
-          // Update existing data for this version
-          durationData[pageIndex].data[versionIndex] = {
-            ...durationData[pageIndex].data[versionIndex],
+          acc[pageIndex].data[versionIndex] = {
+            ...acc[pageIndex].data[versionIndex],
             avg_duration: dataItem.avg_duration,
           };
         }
       } else {
-        // If this page number doesn't exist, add it with the version data
-        durationData.push({
+        acc.push({
           pageNumber: dataItem.pageNumber,
           data: [
             {
@@ -73,22 +64,26 @@ export default function StatsChart({
           ],
         });
       }
-    });
 
-    // Sort by page number
-    durationData.sort(
-      (a, b) => parseInt(a.pageNumber) - parseInt(b.pageNumber),
+      return acc;
+    },
+    Array.from({ length: totalPagesMax }, (_, i) => ({
+      pageNumber: (i + 1).toString(),
+      data: [],
+    })),
+  ).filter((item) => item.data.length > 0);
+
+  if (!analyticsEnabled || durationData.length === 0) {
+    return (
+      <div className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+        Detailed engagement analytics are disabled or unavailable for this document.
+      </div>
     );
   }
 
-  const hasStats =
-    (stats?.views?.length ?? 0) > 0 || (stats?.duration?.data?.length ?? 0) > 0;
-
-  return hasStats ? (
+  return (
     <div className="rounded-bl-lg border-b border-l pb-0.5 pl-0.5 md:pb-1 md:pl-1">
       <BarChartComponent data={durationData} />
     </div>
-  ) : (
-    <StatsChartDummy totalPagesMax={totalPagesMax} />
   );
 }

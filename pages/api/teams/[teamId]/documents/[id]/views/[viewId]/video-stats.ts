@@ -4,6 +4,7 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 
 import prisma from "@/lib/prisma";
+import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
 import { getVideoEventsByView } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
 
@@ -66,25 +67,38 @@ export default async function handler(
       return res.status(400).json({ error: "Video length not found" });
     }
 
-    // Fetch video events from Tinybird
-    const response = await getVideoEventsByView({
-      view_id: viewId,
-      document_id: documentId,
-    });
+    let analyticsEnabled = true;
+    let response;
+
+    try {
+      response = await callTinybird(() =>
+        getVideoEventsByView({
+          view_id: viewId,
+          document_id: documentId,
+        }),
+      );
+    } catch (error) {
+      if (error instanceof TinybirdUnauthorizedError) {
+        analyticsEnabled = false;
+        response = { data: [] } as any;
+      } else {
+        console.error("Error fetching video stats:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+      }
+    }
 
     if (!response?.data) {
-      return res.status(200).json({ data: [] });
+      return res.status(200).json({ data: [], analyticsEnabled });
     }
 
     // Filter for valid events and ensure valid time ranges > 1 second
-    const validEvents = response.data.filter(
-      (event) =>
-        (event.event_type === "played" ||
-          event.event_type === "muted" ||
-          event.event_type === "unmuted" ||
-          event.event_type === "rate_changed") &&
-        event.end_time > event.start_time &&
-        event.end_time - event.start_time >= 1,
+    const validEvents = response.data.filter((event: any) =>
+      (event.event_type === "played" ||
+        event.event_type === "muted" ||
+        event.event_type === "unmuted" ||
+        event.event_type === "rate_changed") &&
+      event.end_time > event.start_time &&
+      event.end_time - event.start_time >= 1,
     );
 
     // Create a baseline array with zeros for every second
@@ -94,7 +108,7 @@ export default async function handler(
     }
 
     // Fill in the actual playback periods
-    validEvents.forEach((event) => {
+    validEvents.forEach((event: any) => {
       // For each second in the duration, increment the view count
       for (let t = event.start_time; t < event.end_time; t++) {
         viewDistributionMap.set(t, (viewDistributionMap.get(t) || 0) + 1);
@@ -111,6 +125,7 @@ export default async function handler(
 
     return res.status(200).json({
       data: distributionArray,
+      analyticsEnabled,
     });
   } catch (error) {
     console.error("Error fetching video stats:", error);

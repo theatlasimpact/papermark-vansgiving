@@ -1,10 +1,10 @@
-import { Tinybird } from "@chronark/zod-bird";
 import { z } from "zod";
 
 import { VIDEO_EVENT_TYPES } from "../constants";
 import { WEBHOOK_TRIGGERS } from "../webhook/constants";
+import { tinybirdClient } from "./client";
 
-const tb = new Tinybird({ token: process.env.TINYBIRD_TOKEN! });
+const tb = tinybirdClient;
 
 export const publishPageView = tb.buildIngestEndpoint({
   datasource: "page_views__v3",

@@ -120,6 +120,7 @@ type TStatsData = {
   hiddenViewCount: number;
   viewsWithDuration: ViewWithDuration[];
   totalViews: number;
+  analyticsEnabled?: boolean;
 };
 
 export function useDocumentVisits(page: number, limit: number) {
@@ -146,6 +147,7 @@ export function useDocumentVisits(page: number, limit: number) {
 
   return {
     views,
+    analyticsEnabled: views?.analyticsEnabled ?? true,
     loading: !error && !views,
     error,
     mutate,
@@ -198,16 +200,8 @@ export function useDocumentThumbnail(
   );
 
   if (pageNumber === 0) {
-    return {
-      data: null,
-      loading: false,
-      error: null,
-    };
+    return { imageUrl: null, isLoading: false, isError: false };
   }
 
-  return {
-    data,
-    loading: !error && !data,
-    error,
-  };
+  return { imageUrl: data?.imageUrl || null, isLoading: !error && !data, isError: error };
 }

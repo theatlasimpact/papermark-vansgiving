@@ -7,6 +7,8 @@ import { getServerSession } from "next-auth/next";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import {
+  callTinybird,
+  TinybirdUnauthorizedError,
   getTotalAvgPageDuration,
   getTotalDocumentDuration,
   getViewPageDuration,
@@ -121,17 +123,17 @@ export default async function handle(
           : Promise.resolve([]),
       ]);
 
-      const activeViews = views.filter((view) => !view.isArchived);
-      const archivedViews = views.filter((view) => view.isArchived);
+      const excludedTeamViews = views.filter((view: View) =>
+        users.some((user: { email: string | null }) =>
+          user.email !== null && user.email === view.viewerEmail,
+        ),
+      );
 
-      let internalViews: View[] = [];
-      if (excludeMembers) {
-        internalViews = activeViews.filter((view) => {
-          return users.some((user) => user.email === view.viewerEmail);
-        });
-      }
+      const archivedViews = views.filter((view) => view.isArchived === true);
 
-      const allExcludedViews = [...internalViews, ...archivedViews];
+      const allExcludedViews = excludeMembers
+        ? [...excludedTeamViews, ...archivedViews]
+        : [...archivedViews];
 
       const filteredViews = views.filter(
         (view) => !allExcludedViews.map((view) => view.id).includes(view.id),
@@ -144,99 +146,124 @@ export default async function handle(
           total_duration: 0,
           avgCompletionRate: 0,
           totalViews: 0,
+          analyticsEnabled: true,
         });
       }
 
-      const [duration, totalDocumentDuration] = await Promise.all([
-        getTotalAvgPageDuration({
-          documentId: docId,
-          excludedLinkIds: "",
-          excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
-          since: 0,
-        }),
-        getTotalDocumentDuration({
-          documentId: docId,
-          excludedLinkIds: "",
-          excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
-          since: 0,
-        }),
-      ]);
-
-      const durationWithMs = {
-        ...duration,
-        data: duration.data.map((dataPoint) => ({
-          ...dataPoint,
-          // Tinybird returns seconds; convert to milliseconds for UI consumers.
-          avg_duration: dataPoint.avg_duration * 1000,
-        })),
-      };
-
+      let durationWithMs: {
+        data: { avg_duration: number; pageNumber: string; versionNumber: number }[];
+      } = { data: [] };
       let totalDurationAverageMs = 0;
-      if (filteredViews.length > 0) {
-        const totalDuration = totalDocumentDuration.data?.[0]?.sum_duration ?? 0;
-        totalDurationAverageMs =
-          (totalDuration * 1000) / (filteredViews.length || 1);
-      }
-
       let avgCompletionRate = 0;
-      if (filteredViews.length > 0) {
-        if (document.type === "video") {
-          const videoEvents = await getVideoEventsByDocument({
-            document_id: docId,
-          });
+      let analyticsEnabled = true;
 
-          const completionRates = await Promise.all(
-            filteredViews.map(async (view) => {
-              const viewEvents =
-                videoEvents?.data.filter(
-                  (event: any) =>
-                    event.view_id === view.id &&
-                    ["played", "muted", "unmuted", "rate_changed"].includes(
-                      event.event_type,
-                    ) &&
-                    event.end_time > event.start_time &&
-                    event.end_time - event.start_time >= 1,
-                ) || [];
-
-              const uniqueTimestamps = new Set<number>();
-              viewEvents.forEach((event: any) => {
-                for (let t = event.start_time; t < event.end_time; t++) {
-                  uniqueTimestamps.add(Math.floor(t));
-                }
-              });
-
-              const videoLength = document.versions[0]?.length || 0;
-              return videoLength > 0
-                ? Math.min(100, (uniqueTimestamps.size / videoLength) * 100)
-                : 0;
+      try {
+        const [duration, totalDocumentDuration] = await Promise.all([
+          callTinybird(() =>
+            getTotalAvgPageDuration({
+              documentId: docId,
+              excludedLinkIds: "",
+              excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
+              since: 0,
             }),
-          );
+          ),
+          callTinybird(() =>
+            getTotalDocumentDuration({
+              documentId: docId,
+              excludedLinkIds: "",
+              excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
+              since: 0,
+            }),
+          ),
+        ]);
 
-          avgCompletionRate =
-            completionRates.reduce((sum, rate) => sum + rate, 0) /
-            completionRates.length;
+        durationWithMs = {
+          ...duration,
+          data: duration.data.map((dataPoint) => ({
+            ...dataPoint,
+            // Tinybird returns seconds; convert to milliseconds for UI consumers.
+            avg_duration: dataPoint.avg_duration * 1000,
+          })),
+        };
+
+        if (filteredViews.length > 0) {
+          const totalDuration = totalDocumentDuration.data?.[0]?.sum_duration ?? 0;
+          totalDurationAverageMs =
+            (totalDuration * 1000) / (filteredViews.length || 1);
+        }
+
+        if (filteredViews.length > 0) {
+          if (document.type === "video") {
+            const videoEvents = await callTinybird(() =>
+              getVideoEventsByDocument({
+                document_id: docId,
+              }),
+            );
+
+            const completionRates = await Promise.all(
+              filteredViews.map(async (view) => {
+                const viewEvents =
+                  videoEvents?.data.filter(
+                    (event: any) =>
+                      event.view_id === view.id &&
+                      ["played", "muted", "unmuted", "rate_changed"].includes(
+                        event.event_type,
+                      ) &&
+                      event.end_time > event.start_time &&
+                      event.end_time - event.start_time >= 1,
+                  ) || [];
+
+                const uniqueTimestamps = new Set<number>();
+                viewEvents.forEach((event: any) => {
+                  for (let t = event.start_time; t < event.end_time; t++) {
+                    uniqueTimestamps.add(Math.floor(t));
+                  }
+                });
+
+                const videoLength = document.versions[0]?.length || 0;
+                return videoLength > 0
+                  ? Math.min(100, (uniqueTimestamps.size / videoLength) * 100)
+                  : 0;
+              }),
+            );
+
+            avgCompletionRate =
+              completionRates.reduce((sum, rate) => sum + rate, 0) /
+              completionRates.length;
+          } else {
+            const completionRates = await Promise.all(
+              filteredViews.map(async (view) => {
+                const pageData = await callTinybird(() =>
+                  getViewPageDuration({
+                    documentId: docId,
+                    viewId: view.id,
+                    since: 0,
+                  }),
+                );
+
+                const relevantVersion = document.versions.find(
+                  (version) => version.createdAt <= view.viewedAt,
+                );
+                const numPages =
+                  relevantVersion?.numPages || document.numPages || 0;
+
+                return numPages > 0 ? (pageData.data.length / numPages) * 100 : 0;
+              }),
+            );
+
+            avgCompletionRate =
+              completionRates.reduce((sum, rate) => sum + rate, 0) /
+              completionRates.length;
+          }
+        }
+      } catch (durationError) {
+        if (durationError instanceof TinybirdUnauthorizedError) {
+          analyticsEnabled = false;
+          durationWithMs = { data: [] };
+          totalDurationAverageMs = 0;
+          avgCompletionRate = 0;
         } else {
-          const completionRates = await Promise.all(
-            filteredViews.map(async (view) => {
-              const pageData = await getViewPageDuration({
-                documentId: docId,
-                viewId: view.id,
-                since: 0,
-              });
-
-              const relevantVersion = document.versions.find(
-                (version) => version.createdAt <= view.viewedAt,
-              );
-              const numPages =
-                relevantVersion?.numPages || document.numPages || 0;
-
-              return numPages > 0 ? (pageData.data.length / numPages) * 100 : 0;
-            }),
-          );
-
-          avgCompletionRate =
-            completionRates.reduce((sum, rate) => sum + rate, 0) /
-            completionRates.length;
+          throw durationError;
         }
       }
 
@@ -246,6 +273,7 @@ export default async function handle(
         total_duration: totalDurationAverageMs,
         avgCompletionRate: Math.round(avgCompletionRate),
         totalViews: filteredViews.length,
+        analyticsEnabled,
       };
 
       return res.status(200).json(stats);

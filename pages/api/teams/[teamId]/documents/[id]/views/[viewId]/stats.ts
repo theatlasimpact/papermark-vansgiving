@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
+import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
 import { getViewPageDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 
@@ -61,27 +62,42 @@ export default async function handle(
         return res.status(404).json({ error: "Document not found" });
       }
 
-      const duration = await getViewPageDuration({
-        documentId: docId,
-        viewId: viewId,
-        since: 0,
-      });
+      let analyticsEnabled = true;
+      let normalizedDuration;
 
-      const normalizedDuration = {
-        ...duration,
-        data: duration.data.map((dataPoint) => ({
-          ...dataPoint,
-          // Tinybird returns seconds; convert to milliseconds for UI consumers.
-          sum_duration: dataPoint.sum_duration * 1000,
-        })),
-      };
+      try {
+        const duration = await callTinybird(() =>
+          getViewPageDuration({
+            documentId: docId,
+            viewId: viewId,
+            since: 0,
+          }),
+        );
+
+        normalizedDuration = {
+          ...duration,
+          data: duration.data.map((dataPoint) => ({
+            ...dataPoint,
+            // Tinybird returns seconds; convert to milliseconds for UI consumers.
+            sum_duration: dataPoint.sum_duration * 1000,
+          })),
+        };
+      } catch (durationError) {
+        if (durationError instanceof TinybirdUnauthorizedError) {
+          analyticsEnabled = false;
+          normalizedDuration = { data: [] };
+        } else {
+          throw durationError;
+        }
+      }
 
       const total_duration = normalizedDuration.data.reduce(
-        (totalDuration, data) => totalDuration + data.sum_duration,
+        (totalDuration: number, data: { sum_duration: number }) =>
+          totalDuration + (data.sum_duration || 0),
         0,
       );
 
-      const stats = { duration: normalizedDuration, total_duration };
+      const stats = { duration: normalizedDuration, total_duration, analyticsEnabled };
 
       return res.status(200).json(stats);
     } catch (error) {

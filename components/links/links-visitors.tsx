@@ -13,7 +13,7 @@ export default function LinksVisitors({
   linkId: string;
   linkName: string;
 }) {
-  const { views, loading, error } = useLinkVisits(linkId);
+  const { visits, loading, error, analyticsEnabled } = useLinkVisits(linkId);
 
   if (loading) {
     return (
@@ -47,7 +47,17 @@ export default function LinksVisitors({
     );
   }
 
-  if (!views || views.length === 0) {
+  if (!analyticsEnabled) {
+    return (
+      <TableRow>
+        <TableCell colSpan={4} className="text-sm text-muted-foreground">
+          Detailed view analytics are disabled for this deployment (Tinybird unauthorized).
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  if (!visits || visits.length === 0) {
     return (
       <TableRow>
         <TableCell colSpan={4} className="text-sm text-muted-foreground">
@@ -59,7 +69,7 @@ export default function LinksVisitors({
 
   return (
     <>
-      {views.map((view) => (
+      {visits.map((view) => (
         <TableRow key={view.id}>
           <TableCell colSpan={2}>
             <div className="flex items-center overflow-visible sm:space-x-3">

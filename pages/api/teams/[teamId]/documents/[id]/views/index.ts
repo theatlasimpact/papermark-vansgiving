@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth/next";
 import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
+import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
 import { getViewPageDuration } from "@/lib/tinybird";
 import { getVideoEventsByDocument } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
@@ -132,11 +133,13 @@ async function getVideoViews(
 
 async function getDocumentViews(views: ViewWithExtras[], document: Document) {
   const durationsPromises = views.map((view) => {
-    return getViewPageDuration({
-      documentId: document.id,
-      viewId: view.id,
-      since: 0,
-    });
+    return callTinybird(() =>
+      getViewPageDuration({
+        documentId: document.id,
+        viewId: view.id,
+        since: 0,
+      }),
+    );
   });
 
   const durations = await Promise.all(durationsPromises);
@@ -315,6 +318,7 @@ export default async function handle(
           viewsWithDuration: [],
           hiddenViewCount: 0,
           totalViews: 0,
+          analyticsEnabled: true,
         });
       }
 
@@ -336,12 +340,16 @@ export default async function handle(
       const limitedViews =
         team.plan === "free" && offset >= LIMITS.views ? [] : views;
 
+      let analyticsEnabled = true;
       let viewsWithDuration;
+
       try {
         if (document.type === "video") {
-          const videoEvents = await getVideoEventsByDocument({
-            document_id: docId,
-          });
+          const videoEvents = await callTinybird(() =>
+            getVideoEventsByDocument({
+              document_id: docId,
+            }),
+          );
           viewsWithDuration = await getVideoViews(
             limitedViews,
             document,
@@ -351,28 +359,50 @@ export default async function handle(
           viewsWithDuration = await getDocumentViews(limitedViews, document);
         }
       } catch (durationError) {
-        await log({
-          message: `Failed to load view durations for document ${docId}: ${durationError}`,
-          type: "error",
-        });
-        viewsWithDuration = limitedViews.map((view) => {
-          const relevantDocumentVersion = document.versions.find(
-            (version) => version.createdAt <= view.viewedAt,
-          );
-          const numPages =
-            relevantDocumentVersion?.numPages || document.numPages || 0;
+        if (durationError instanceof TinybirdUnauthorizedError) {
+          analyticsEnabled = false;
+          viewsWithDuration = limitedViews.map((view) => {
+            const relevantDocumentVersion = document.versions.find(
+              (version) => version.createdAt <= view.viewedAt,
+            );
+            const numPages =
+              relevantDocumentVersion?.numPages || document.numPages || 0;
 
-          return {
-            ...view,
-            duration: { data: [] },
-            totalDuration: 0,
-            durationSeconds: 0,
-            completionRate: 0,
-            completionPercent: 0,
-            versionNumber: relevantDocumentVersion?.versionNumber || 1,
-            versionNumPages: numPages,
-          };
-        });
+            return {
+              ...view,
+              duration: { data: [] },
+              totalDuration: 0,
+              durationSeconds: 0,
+              completionRate: 0,
+              completionPercent: 0,
+              versionNumber: relevantDocumentVersion?.versionNumber || 1,
+              versionNumPages: numPages,
+            };
+          });
+        } else {
+          await log({
+            message: `Failed to load view durations for document ${docId}: ${durationError}`,
+            type: "error",
+          });
+          viewsWithDuration = limitedViews.map((view) => {
+            const relevantDocumentVersion = document.versions.find(
+              (version) => version.createdAt <= view.viewedAt,
+            );
+            const numPages =
+              relevantDocumentVersion?.numPages || document.numPages || 0;
+
+            return {
+              ...view,
+              duration: { data: [] },
+              totalDuration: 0,
+              durationSeconds: 0,
+              completionRate: 0,
+              completionPercent: 0,
+              versionNumber: relevantDocumentVersion?.versionNumber || 1,
+              versionNumPages: numPages,
+            };
+          });
+        }
       }
 
       viewsWithDuration = viewsWithDuration.map((view: any) => ({
@@ -384,6 +414,7 @@ export default async function handle(
         viewsWithDuration,
         hiddenViewCount: Math.max(views.length - limitedViews.length, 0),
         totalViews: document._count.views || 0,
+        analyticsEnabled,
       });
     } catch (error) {
       log({

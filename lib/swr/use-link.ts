@@ -67,8 +67,14 @@ interface ViewWithDuration extends View {
   completionPercent?: number;
 }
 
+interface LinkVisitsResponse {
+  visits: ViewWithDuration[];
+  totalVisits: number;
+  analyticsEnabled: boolean;
+}
+
 export function useLinkVisits(linkId: string) {
-  const { data: views, error } = useSWR<ViewWithDuration[]>(
+  const { data, error } = useSWR<LinkVisitsResponse>(
     linkId && `/api/links/${encodeURIComponent(linkId)}/visits`,
     fetcher,
     {
@@ -77,8 +83,10 @@ export function useLinkVisits(linkId: string) {
   );
 
   return {
-    views,
-    loading: !error && !views,
+    visits: data?.visits ?? [],
+    totalVisits: data?.totalVisits ?? 0,
+    analyticsEnabled: data?.analyticsEnabled ?? true,
+    loading: !error && !data,
     error,
   };
 }
