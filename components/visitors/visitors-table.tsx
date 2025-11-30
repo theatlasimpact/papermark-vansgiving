@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useTeam } from "@/context/team-context";
 import { PlanEnum } from "@/ee/stripe/constants";
@@ -74,27 +74,32 @@ export default function VisitorsTable({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  const { views, mutate: mutateViews } = useDocumentVisits(
+  const { views, loading, error, mutate: mutateViews } = useDocumentVisits(
     currentPage,
     pageSize,
   );
   const { plan, isTrial } = usePlan();
   const isFreePlan = plan === "free";
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     setCurrentPage(1);
   };
 
+  useEffect(() => {
+    if (error) {
+      console.error("Failed to load visitors", error);
+    }
+  }, [error]);
+
   const handleArchiveView = async (
     viewId: string,
     targetId: string,
     isArchived: boolean,
   ) => {
-    setIsLoading(true);
+    setIsArchiving(true);
 
     const response = await fetch(
       `/api/teams/${teamId}/views/${viewId}/archive`,
@@ -111,12 +116,11 @@ export default function VisitorsTable({
 
     if (!response.ok) {
       toast.error("Failed to archive view");
+      setIsArchiving(false);
       return;
     }
 
-    // mutate the views on the current page
     mutateViews();
-    // mutate the stats
     mutate(
       `/api/teams/${teamId}/documents/${encodeURIComponent(targetId)}/stats`,
     );
@@ -126,8 +130,16 @@ export default function VisitorsTable({
         ? "View successfully archived"
         : "View successfully unarchived",
     );
-    setIsLoading(false);
+    setIsArchiving(false);
   };
+
+  const hasViews = useMemo(
+    () => (views?.viewsWithDuration?.length ?? 0) > 0,
+    [views?.viewsWithDuration?.length],
+  );
+  const hasHiddenViews = (views?.hiddenViewCount ?? 0) > 0;
+  const showEmptyState = !loading && !error && !hasViews && !hasHiddenViews;
+  const totalViews = views?.totalViews ?? 0;
 
   return (
     <div className="w-full">
@@ -146,18 +158,48 @@ export default function VisitorsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {views?.viewsWithDuration.length === 0 &&
-              views?.hiddenViewCount === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5}>
-                    <div className="flex h-40 w-full items-center justify-center">
-                      <p>No views yet. Try sharing a link.</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            {views?.viewsWithDuration ? (
-              views.viewsWithDuration.map((view) => {
+            {loading && (
+              <TableRow>
+                <TableCell className="min-w-[100px]">
+                  <Skeleton className="h-6 w-full" />
+                </TableCell>
+                <TableCell className="min-w-[450px]">
+                  <Skeleton className="h-6 w-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-6 w-24" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-6 w-24" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-6 w-24" />
+                </TableCell>
+              </TableRow>
+            )}
+
+            {!loading && error && (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <div className="flex h-40 w-full items-center justify-center text-sm text-muted-foreground">
+                    Unable to load visitors. Please try again.
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {showEmptyState && (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <div className="flex h-40 w-full items-center justify-center">
+                    <p>No views yet. Try sharing a link.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {!loading && !error && hasViews &&
+              views?.viewsWithDuration?.map((view) => {
                 if (view.isArchived) {
                   return (
                     <TableRow
@@ -252,7 +294,7 @@ export default function VisitorsTable({
                                   view.isArchived,
                                 );
                               }}
-                              disabled={isLoading}
+                              disabled={isArchiving}
                             >
                               <ArchiveRestoreIcon className="mr-2 h-4 w-4" />
                               Restore
@@ -408,7 +450,7 @@ export default function VisitorsTable({
                                       view.isArchived,
                                     );
                                   }}
-                                  disabled={isLoading}
+                                  disabled={isArchiving}
                                 >
                                   <ArchiveIcon className="mr-2 h-4 w-4" />
                                   Archive
@@ -473,24 +515,9 @@ export default function VisitorsTable({
                     </>
                   </Collapsible>
                 );
-              })
-            ) : (
-              <TableRow>
-                <TableCell className="min-w-[100px]">
-                  <Skeleton className="h-6 w-full" />
-                </TableCell>
-                <TableCell className="min-w-[450px]">
-                  <Skeleton className="h-6 w-full" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-6 w-24" />
-                </TableCell>
-                <TableCell>
-                  <Skeleton className="h-6 w-24" />
-                </TableCell>
-              </TableRow>
-            )}
-            {views?.hiddenViewCount! > 0 && (
+              })}
+
+            {!loading && !error && hasHiddenViews && (
               <>
                 <TableRow className="">
                   <TableCell colSpan={5} className="text-left sm:text-center">
@@ -511,7 +538,7 @@ export default function VisitorsTable({
                     </div>
                   </TableCell>
                 </TableRow>
-                {Array.from({ length: views?.hiddenViewCount! }).map((_, i) => (
+                {Array.from({ length: views?.hiddenViewCount || 0 }).map((_, i) => (
                   <VisitorBlurred key={i} />
                 ))}
               </>
@@ -523,18 +550,15 @@ export default function VisitorsTable({
         itemName="visits"
         currentPage={currentPage}
         pageSize={pageSize}
-        totalItems={views?.totalViews || 0}
+        totalItems={totalViews}
         totalPages={
-          views?.totalViews ? Math.ceil(views.totalViews / pageSize) : 0
+          totalViews ? Math.ceil(totalViews / pageSize) : 0
         }
         onPageChange={setCurrentPage}
         onPageSizeChange={handlePageSizeChange}
         totalShownItems={
-          views?.totalViews
-            ? Math.min(
-                pageSize,
-                views.totalViews - (currentPage - 1) * pageSize,
-              )
+          totalViews
+            ? Math.min(pageSize, totalViews - (currentPage - 1) * pageSize)
             : 0
         }
       />
