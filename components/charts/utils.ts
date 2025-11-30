@@ -47,30 +47,31 @@ export type Color =
   | "rose"
   | "gray-300";
 
+const colorArray = [
+  "emerald",
+  "teal",
+  "gray",
+  "orange",
+  "zinc",
+  "neutral",
+  "stone",
+  "red",
+  "amber",
+  "yellow",
+  "lime",
+  "green",
+  "cyan",
+  "sky",
+  "blue",
+  "indigo",
+  "violet",
+  "purple",
+  "fuchsia",
+  "pink",
+  "rose",
+];
+
 export const getColors = (versionNumbers: string[]): Color[] => {
-  const colorArray = [
-    "emerald",
-    "teal",
-    "gray",
-    "orange",
-    "zinc",
-    "neutral",
-    "stone",
-    "red",
-    "amber",
-    "yellow",
-    "lime",
-    "green",
-    "cyan",
-    "sky",
-    "blue",
-    "indigo",
-    "violet",
-    "purple",
-    "fuchsia",
-    "pink",
-    "rose",
-  ];
   return versionNumbers.map((versionNumber: string) => {
     const versionIndex = parseInt(versionNumber.split(" ")[1]) - 1;
     return colorArray[versionIndex % colorArray.length] as Color;
@@ -78,31 +79,13 @@ export const getColors = (versionNumbers: string[]): Color[] => {
 };
 
 export const getColorForVersion = (versionNumber: string): Color => {
-  const versionIndex = parseInt(versionNumber.split(" ")[1]) - 1;
-  const colorArray = [
-    "emerald",
-    "teal",
-    "gray",
-    "orange",
-    "zinc",
-    "neutral",
-    "stone",
-    "red",
-    "amber",
-    "yellow",
-    "lime",
-    "green",
-    "cyan",
-    "sky",
-    "blue",
-    "indigo",
-    "violet",
-    "purple",
-    "fuchsia",
-    "pink",
-    "rose",
-  ];
-  return colorArray[versionIndex % colorArray.length] as Color;
+  const parsedIndex = parseInt(versionNumber.split(" ")[1]);
+  if (Number.isNaN(parsedIndex)) {
+    return "emerald";
+  }
+
+  const normalizedIndex = Math.max(parsedIndex - 1, 0);
+  return colorArray[normalizedIndex % colorArray.length] as Color;
 };
 
 export const timeFormatter = (number: number) => {

@@ -6,6 +6,7 @@ import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { teamHasFeature } from "@/lib/plan/guards";
+import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
 import { getViewPageDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
@@ -65,7 +66,11 @@ export default async function handle(
 
       // If link doesn't exist (deleted), return empty array
       if (!result || !result.document || result.deletedAt) {
-        return res.status(200).json([]);
+        return res.status(200).json({
+          visits: [],
+          totalVisits: 0,
+          analyticsEnabled: true,
+        });
       }
 
       // authorize: allow document owners or team members
@@ -114,52 +119,77 @@ export default async function handle(
           ? views.slice(0, LIMITS.views)
           : views;
 
-      const durationsPromises = limitedViews.map((view) => {
-        return getViewPageDuration({
-          documentId: view.documentId!,
-          viewId: view.id,
-          since: 0,
+      let analyticsEnabled = true;
+      let viewsWithDuration;
+
+      try {
+        const durationsPromises = limitedViews.map((view) => {
+          return callTinybird(() =>
+            getViewPageDuration({
+              documentId: view.documentId!,
+              viewId: view.id,
+              since: 0,
+            }),
+          );
         });
+
+        const durations = await Promise.all(durationsPromises);
+
+        // Construct the response combining views and their respective durations
+        viewsWithDuration = limitedViews.map((view, index) => {
+          const normalizedDuration = {
+            ...durations[index],
+            data: durations[index].data.map((dataPoint) => ({
+              ...dataPoint,
+              // Tinybird returns seconds; convert to milliseconds for UI consumers.
+              sum_duration: dataPoint.sum_duration * 1000,
+            })),
+          };
+
+          const totalDurationMs = normalizedDuration.data.reduce(
+            (totalDuration, data) => totalDuration + data.sum_duration,
+            0,
+          );
+
+          // calculate the completion rate
+          const completionRate = numPages
+            ? (normalizedDuration.data.filter((data) => data.sum_duration > 0)
+                .length /
+                numPages) *
+              100
+            : 0;
+          const completionPercent = Math.min(100, Math.round(completionRate));
+
+          return {
+            ...view,
+            duration: normalizedDuration,
+            totalDuration: totalDurationMs,
+            durationSeconds: totalDurationMs / 1000,
+            completionRate: completionPercent,
+            completionPercent,
+          };
+        });
+      } catch (durationError) {
+        if (durationError instanceof TinybirdUnauthorizedError) {
+          analyticsEnabled = false;
+          viewsWithDuration = limitedViews.map((view) => ({
+            ...view,
+            duration: { data: [] },
+            totalDuration: 0,
+            durationSeconds: 0,
+            completionRate: 0,
+            completionPercent: 0,
+          }));
+        } else {
+          throw durationError;
+        }
+      }
+
+      return res.status(200).json({
+        visits: viewsWithDuration,
+        totalVisits: limitedViews.length,
+        analyticsEnabled,
       });
-
-      const durations = await Promise.all(durationsPromises);
-
-      // Construct the response combining views and their respective durations
-      const viewsWithDuration = limitedViews.map((view, index) => {
-        const normalizedDuration = {
-          ...durations[index],
-          data: durations[index].data.map((dataPoint) => ({
-            ...dataPoint,
-            // Tinybird returns seconds; convert to milliseconds for UI consumers.
-            sum_duration: dataPoint.sum_duration * 1000,
-          })),
-        };
-
-        const totalDurationMs = normalizedDuration.data.reduce(
-          (totalDuration, data) => totalDuration + data.sum_duration,
-          0,
-        );
-
-        // calculate the completion rate
-        const completionRate = numPages
-          ? (normalizedDuration.data.filter((data) => data.sum_duration > 0)
-              .length /
-              numPages) *
-            100
-          : 0;
-        const completionPercent = Math.min(100, Math.round(completionRate));
-
-        return {
-          ...view,
-          duration: normalizedDuration,
-          totalDuration: totalDurationMs,
-          durationSeconds: totalDurationMs / 1000,
-          completionRate: completionPercent,
-          completionPercent,
-        };
-      });
-
-      return res.status(200).json(viewsWithDuration);
     } catch (error) {
       log({
         message: `Failed to get views for link: _${id}_. \n\n ${error} \n\n*Metadata*: \`{userId: ${userId}}\``,

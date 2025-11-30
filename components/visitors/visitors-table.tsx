@@ -74,7 +74,7 @@ export default function VisitorsTable({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  const { views, loading, error, mutate: mutateViews } = useDocumentVisits(
+  const { views, loading, error, mutate: mutateViews, analyticsEnabled } = useDocumentVisits(
     currentPage,
     pageSize,
   );
@@ -567,6 +567,11 @@ export default function VisitorsTable({
           </TableBody>
         </Table>
       </div>
+      {analyticsEnabled === false && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Detailed engagement metrics (duration & completion) are disabled because Tinybird analytics is not authorized for this deployment.
+        </p>
+      )}
       <Pagination
         itemName="visits"
         currentPage={currentPage}

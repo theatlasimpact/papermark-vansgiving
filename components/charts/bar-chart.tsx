@@ -11,19 +11,6 @@ import {
   timeFormatter,
 } from "./utils";
 
-const renameDummyDurationKey = (data: Data[]): TransformedData[] => {
-  return data.reduce((acc, { pageNumber, data }) => {
-    const transformedItem: Partial<TransformedData> = { pageNumber };
-
-    data.forEach(({ versionNumber, avg_duration }) => {
-      transformedItem[`Example time spent per page`] = avg_duration;
-    });
-
-    acc.push(transformedItem as TransformedData);
-    return acc;
-  }, [] as TransformedData[]);
-};
-
 const renameSumDurationKey = (data: SumData[], versionNumber?: number) => {
   return data.map((item) => {
     return {
@@ -62,12 +49,10 @@ const getVersionNumbers = (data: TransformedData[]) => {
 export default function BarChartComponent({
   data,
   isSum = false,
-  isDummy = false,
   versionNumber,
 }: {
   data: any;
   isSum?: boolean;
-  isDummy?: boolean;
   versionNumber?: number;
 }) {
   const [, setValue] = useState<any>(null);
@@ -86,20 +71,14 @@ export default function BarChartComponent({
         yAxisWidth={50}
         showGridLines={false}
         onValueChange={(v) => setValue(v)}
-        customTooltip={isDummy ? undefined : CustomTooltip}
+        customTooltip={CustomTooltip}
       />
     );
   }
 
-  let renamedData = transformData(data);
-  let versionNumbers = getVersionNumbers(renamedData);
-  let colors = getColors(versionNumbers);
-
-  if (isDummy) {
-    colors = ["gray-300"];
-    renamedData = renameDummyDurationKey(data);
-    versionNumbers = getVersionNumbers(renamedData);
-  }
+  const renamedData = transformData(data);
+  const versionNumbers = getVersionNumbers(renamedData);
+  const colors = getColors(versionNumbers);
 
   return (
     <BarChart
@@ -112,7 +91,7 @@ export default function BarChartComponent({
       yAxisWidth={50}
       showGridLines={false}
       onValueChange={(v) => setValue(v)}
-      customTooltip={isDummy ? undefined : CustomTooltip}
+      customTooltip={CustomTooltip}
     />
   );
 }
