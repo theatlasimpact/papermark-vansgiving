@@ -14,3 +14,5 @@ SQL >
     WHERE
         view_id = {{ String(viewId, required=True) }}
     LIMIT 1
+
+TOKEN papermark_read READ

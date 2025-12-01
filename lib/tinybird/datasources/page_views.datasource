@@ -39,3 +39,4 @@ SCHEMA >
 ENGINE "MergeTree"
 ENGINE_SORTING_KEY "linkId,documentId,viewId,versionNumber,pageNumber,time,id"
 
+TOKEN papermark_write APPEND

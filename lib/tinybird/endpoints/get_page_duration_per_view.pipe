@@ -16,3 +16,5 @@ SQL >
         pageNumber
     ORDER BY
         pageNumber ASC
+
+TOKEN papermark_read READ
