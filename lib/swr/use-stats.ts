@@ -16,6 +16,7 @@ export type TStatsData = {
   total_duration: number;
   totalViews: number;
   analyticsEnabled?: boolean;
+  analyticsUnavailableReason?: string;
 };
 
 export function useStats({
@@ -54,6 +55,7 @@ interface StatsViewData {
     data: { pageNumber: string; sum_duration: number }[];
   };
   analyticsEnabled?: boolean;
+  analyticsUnavailableReason?: string;
 }
 
 export function useVisitorStats(viewId: string) {

@@ -5,9 +5,14 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
-import { getViewPageDuration } from "@/lib/tinybird";
+import { callTinybird, getViewPageDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
+
+type AnalyticsUnavailableReason = "unauthorized" | "error" | undefined;
+
+type ViewDurationResult = {
+  data: { pageNumber: string; sum_duration: number }[];
+};
 
 export default async function handle(
   req: NextApiRequest,
@@ -63,32 +68,33 @@ export default async function handle(
       }
 
       let analyticsEnabled = true;
-      let normalizedDuration;
+      let analyticsUnavailableReason: AnalyticsUnavailableReason;
+      let normalizedDuration: ViewDurationResult = { data: [] };
 
-      try {
-        const duration = await callTinybird(() =>
-          getViewPageDuration({
-            documentId: docId,
-            viewId: viewId,
-            since: 0,
-          }),
-        );
+      const durationResult = await callTinybird(() =>
+        getViewPageDuration({
+          documentId: docId,
+          viewId: viewId,
+          since: 0,
+        }),
+      );
 
+      if (!durationResult.ok) {
+        if (durationResult.unauthorized) {
+          analyticsEnabled = false;
+          analyticsUnavailableReason = "unauthorized";
+        } else {
+          throw durationResult.error || new Error("Failed to fetch view stats");
+        }
+      } else {
         normalizedDuration = {
-          ...duration,
-          data: duration.data.map((dataPoint) => ({
+          ...durationResult.data,
+          data: durationResult.data.data.map((dataPoint) => ({
             ...dataPoint,
             // Tinybird returns seconds; convert to milliseconds for UI consumers.
             sum_duration: dataPoint.sum_duration * 1000,
           })),
         };
-      } catch (durationError) {
-        if (durationError instanceof TinybirdUnauthorizedError) {
-          analyticsEnabled = false;
-          normalizedDuration = { data: [] };
-        } else {
-          throw durationError;
-        }
       }
 
       const total_duration = normalizedDuration.data.reduce(
@@ -97,7 +103,12 @@ export default async function handle(
         0,
       );
 
-      const stats = { duration: normalizedDuration, total_duration, analyticsEnabled };
+      const stats = {
+        duration: normalizedDuration,
+        total_duration,
+        analyticsEnabled,
+        analyticsUnavailableReason,
+      };
 
       return res.status(200).json(stats);
     } catch (error) {

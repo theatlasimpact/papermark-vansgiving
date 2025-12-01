@@ -6,12 +6,17 @@ import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { teamHasFeature } from "@/lib/plan/guards";
-import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
-import { getViewPageDuration } from "@/lib/tinybird";
+import { callTinybird, getViewPageDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
 
 import { authOptions } from "../../auth/[...nextauth]";
+
+type AnalyticsUnavailableReason = "unauthorized" | "error" | undefined;
+
+type ViewDurationResult = {
+  data: { pageNumber: string; sum_duration: number }[];
+};
 
 export default async function handle(
   req: NextApiRequest,
@@ -120,75 +125,81 @@ export default async function handle(
           : views;
 
       let analyticsEnabled = true;
+      let analyticsUnavailableReason: AnalyticsUnavailableReason;
       let viewsWithDuration;
 
-      try {
-        const durationsPromises = limitedViews.map((view) => {
-          return callTinybird(() =>
+      const durationResults = await Promise.all(
+        limitedViews.map((view) =>
+          callTinybird(() =>
             getViewPageDuration({
               documentId: view.documentId!,
               viewId: view.id,
               since: 0,
             }),
-          );
-        });
+          ),
+        ),
+      );
 
-        const durations = await Promise.all(durationsPromises);
+      const durationError = durationResults.find(
+        (result) => !result.ok && !result.unauthorized,
+      );
+      const durationUnauthorized = durationResults.some(
+        (result) => !result.ok && result.unauthorized,
+      );
 
-        // Construct the response combining views and their respective durations
-        viewsWithDuration = limitedViews.map((view, index) => {
-          const normalizedDuration = {
-            ...durations[index],
-            data: durations[index].data.map((dataPoint) => ({
+      if (durationError) {
+        throw durationError.error ?? new Error("Failed to fetch durations");
+      }
+
+      analyticsEnabled = !durationUnauthorized;
+      analyticsUnavailableReason = durationUnauthorized
+        ? "unauthorized"
+        : undefined;
+
+      const safeDuration = (result: ViewDurationResult | undefined) =>
+        result?.data ?? [];
+
+      // Construct the response combining views and their respective durations
+      viewsWithDuration = limitedViews.map((view, index) => {
+        const durationResult = durationResults[index];
+        const normalizedDuration = {
+          data: safeDuration(durationResult.ok ? durationResult.data : undefined).map(
+            (dataPoint) => ({
               ...dataPoint,
               // Tinybird returns seconds; convert to milliseconds for UI consumers.
               sum_duration: dataPoint.sum_duration * 1000,
-            })),
-          };
+            }),
+          ),
+        };
 
-          const totalDurationMs = normalizedDuration.data.reduce(
-            (totalDuration, data) => totalDuration + data.sum_duration,
-            0,
-          );
+        const totalDurationMs = normalizedDuration.data.reduce(
+          (totalDuration, data) => totalDuration + data.sum_duration,
+          0,
+        );
 
-          // calculate the completion rate
-          const completionRate = numPages
-            ? (normalizedDuration.data.filter((data) => data.sum_duration > 0)
-                .length /
-                numPages) *
-              100
-            : 0;
-          const completionPercent = Math.min(100, Math.round(completionRate));
+        // calculate the completion rate
+        const completionRate = numPages
+          ? (normalizedDuration.data.filter((data) => data.sum_duration > 0).length /
+              numPages) *
+            100
+          : 0;
+        const completionPercent = Math.min(100, Math.round(completionRate));
 
-          return {
-            ...view,
-            duration: normalizedDuration,
-            totalDuration: totalDurationMs,
-            durationSeconds: totalDurationMs / 1000,
-            completionRate: completionPercent,
-            completionPercent,
-          };
-        });
-      } catch (durationError) {
-        if (durationError instanceof TinybirdUnauthorizedError) {
-          analyticsEnabled = false;
-          viewsWithDuration = limitedViews.map((view) => ({
-            ...view,
-            duration: { data: [] },
-            totalDuration: 0,
-            durationSeconds: 0,
-            completionRate: 0,
-            completionPercent: 0,
-          }));
-        } else {
-          throw durationError;
-        }
-      }
+        return {
+          ...view,
+          duration: normalizedDuration,
+          totalDuration: totalDurationMs,
+          durationSeconds: totalDurationMs / 1000,
+          completionRate: completionPercent,
+          completionPercent,
+        };
+      });
 
       return res.status(200).json({
         visits: viewsWithDuration,
         totalVisits: limitedViews.length,
         analyticsEnabled,
+        analyticsUnavailableReason,
       });
     } catch (error) {
       log({

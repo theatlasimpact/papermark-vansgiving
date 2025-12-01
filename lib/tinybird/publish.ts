@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { VIDEO_EVENT_TYPES } from "../constants";
 import { WEBHOOK_TRIGGERS } from "../webhook/constants";
-import { tinybirdClient } from "./client";
+import { tinybirdIngestClient } from "./client";
 
-const tb = tinybirdClient;
+const tb = tinybirdIngestClient;
 
 export const publishPageView = tb.buildIngestEndpoint({
   datasource: "page_views__v3",

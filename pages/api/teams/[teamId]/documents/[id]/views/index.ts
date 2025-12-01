@@ -8,11 +8,12 @@ import { getServerSession } from "next-auth/next";
 import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
-import { getViewPageDuration } from "@/lib/tinybird";
+import { callTinybird, getViewPageDuration } from "@/lib/tinybird";
 import { getVideoEventsByDocument } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
+
+type AnalyticsUnavailableReason = "unauthorized" | "error" | undefined;
 
 type DocumentVersion = {
   versionNumber: number;
@@ -55,6 +56,28 @@ type ViewWithExtras = View & {
     agreement: { name: string };
   } | null;
 };
+
+type PageDurationResult = {
+  data: { pageNumber: string; sum_duration: number }[];
+};
+
+function buildFallbackView(view: ViewWithExtras, document: Document) {
+  const relevantDocumentVersion = document.versions.find(
+    (version) => version.createdAt <= view.viewedAt,
+  );
+  const numPages = relevantDocumentVersion?.numPages || document.numPages || 0;
+
+  return {
+    ...view,
+    duration: { data: [] },
+    totalDuration: 0,
+    durationSeconds: 0,
+    completionRate: 0,
+    completionPercent: 0,
+    versionNumber: relevantDocumentVersion?.versionNumber || 1,
+    versionNumPages: numPages,
+  };
+}
 
 async function getVideoViews(
   views: ViewWithExtras[],
@@ -131,31 +154,46 @@ async function getVideoViews(
   });
 }
 
-async function getDocumentViews(views: ViewWithExtras[], document: Document) {
-  const durationsPromises = views.map((view) => {
-    return callTinybird(() =>
-      getViewPageDuration({
-        documentId: document.id,
-        viewId: view.id,
-        since: 0,
-      }),
-    );
-  });
+async function getDocumentViews(
+  views: ViewWithExtras[],
+  document: Document,
+): Promise<{ viewsWithDuration: any[]; unauthorized: boolean }> {
+  const durationsResults = await Promise.all(
+    views.map((view) =>
+      callTinybird(() =>
+        getViewPageDuration({
+          documentId: document.id,
+          viewId: view.id,
+          since: 0,
+        }),
+      ),
+    ),
+  );
 
-  const durations = await Promise.all(durationsPromises);
+  const durationError = durationsResults.find(
+    (result) => !result.ok && !result.unauthorized,
+  );
+  const durationUnauthorized = durationsResults.some(
+    (result) => !result.ok && result.unauthorized,
+  );
 
-  return views.map((view, index) => {
+  if (durationError) {
+    throw durationError.error || new Error("Failed to fetch view analytics");
+  }
+
+  const viewsWithDuration = views.map((view, index) => {
     const relevantDocumentVersion = document.versions.find(
       (version) => version.createdAt <= view.viewedAt,
     );
 
     const numPages =
       relevantDocumentVersion?.numPages || document.numPages || 0;
-    const rawDuration = durations[index];
-
+    const rawDuration = durationsResults[index];
     const normalizedDuration = {
-      ...rawDuration,
-      data: rawDuration.data.map((dataPoint) => ({
+      data: (rawDuration.ok
+        ? rawDuration.data
+        : ({ data: [] } as PageDurationResult)
+      ).data.map((dataPoint) => ({
         ...dataPoint,
         // Tinybird returns seconds; convert to milliseconds for UI consumers.
         sum_duration: dataPoint.sum_duration * 1000,
@@ -186,6 +224,8 @@ async function getDocumentViews(views: ViewWithExtras[], document: Document) {
       versionNumPages: numPages,
     };
   });
+
+  return { viewsWithDuration, unauthorized: durationUnauthorized };
 }
 
 export default async function handle(
@@ -341,68 +381,49 @@ export default async function handle(
         team.plan === "free" && offset >= LIMITS.views ? [] : views;
 
       let analyticsEnabled = true;
-      let viewsWithDuration;
+      let analyticsUnavailableReason: AnalyticsUnavailableReason;
+      let viewsWithDuration: any[] = [];
+
+      const getFallbackViews = () =>
+        limitedViews.map((view) => buildFallbackView(view, document));
 
       try {
         if (document.type === "video") {
-          const videoEvents = await callTinybird(() =>
+          const videoEventsResult = await callTinybird(() =>
             getVideoEventsByDocument({
               document_id: docId,
             }),
           );
-          viewsWithDuration = await getVideoViews(
-            limitedViews,
-            document,
-            videoEvents,
-          );
+
+          if (!videoEventsResult.ok) {
+            analyticsEnabled = false;
+            analyticsUnavailableReason = videoEventsResult.unauthorized
+              ? "unauthorized"
+              : "error";
+            viewsWithDuration = getFallbackViews();
+          } else {
+            viewsWithDuration = await getVideoViews(
+              limitedViews,
+              document,
+              videoEventsResult.data,
+            );
+          }
         } else {
-          viewsWithDuration = await getDocumentViews(limitedViews, document);
+          const documentViews = await getDocumentViews(limitedViews, document);
+          analyticsEnabled = !documentViews.unauthorized;
+          analyticsUnavailableReason = documentViews.unauthorized
+            ? "unauthorized"
+            : undefined;
+          viewsWithDuration = documentViews.viewsWithDuration;
         }
       } catch (durationError) {
-        if (durationError instanceof TinybirdUnauthorizedError) {
-          analyticsEnabled = false;
-          viewsWithDuration = limitedViews.map((view) => {
-            const relevantDocumentVersion = document.versions.find(
-              (version) => version.createdAt <= view.viewedAt,
-            );
-            const numPages =
-              relevantDocumentVersion?.numPages || document.numPages || 0;
-
-            return {
-              ...view,
-              duration: { data: [] },
-              totalDuration: 0,
-              durationSeconds: 0,
-              completionRate: 0,
-              completionPercent: 0,
-              versionNumber: relevantDocumentVersion?.versionNumber || 1,
-              versionNumPages: numPages,
-            };
-          });
-        } else {
-          await log({
-            message: `Failed to load view durations for document ${docId}: ${durationError}`,
-            type: "error",
-          });
-          viewsWithDuration = limitedViews.map((view) => {
-            const relevantDocumentVersion = document.versions.find(
-              (version) => version.createdAt <= view.viewedAt,
-            );
-            const numPages =
-              relevantDocumentVersion?.numPages || document.numPages || 0;
-
-            return {
-              ...view,
-              duration: { data: [] },
-              totalDuration: 0,
-              durationSeconds: 0,
-              completionRate: 0,
-              completionPercent: 0,
-              versionNumber: relevantDocumentVersion?.versionNumber || 1,
-              versionNumPages: numPages,
-            };
-          });
-        }
+        analyticsEnabled = false;
+        analyticsUnavailableReason = "error";
+        await log({
+          message: `Failed to load view durations for document ${docId}: ${durationError}`,
+          type: "error",
+        });
+        viewsWithDuration = getFallbackViews();
       }
 
       viewsWithDuration = viewsWithDuration.map((view: any) => ({
@@ -415,6 +436,7 @@ export default async function handle(
         hiddenViewCount: Math.max(views.length - limitedViews.length, 0),
         totalViews: document._count.views || 0,
         analyticsEnabled,
+        analyticsUnavailableReason,
       });
     } catch (error) {
       log({
