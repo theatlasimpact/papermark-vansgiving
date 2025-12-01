@@ -127,15 +127,18 @@ export default async function handle(
           : Promise.resolve([]),
       ]);
 
-      const filteredViews = views.filter(
-        (view) => !users.map((user) => user.email).includes(view.viewerEmail!),
-      );
-
+      const archivedViews = views.filter((view) => view.isArchived);
       const hiddenTeamMembers = views.filter((view) =>
         users.map((user) => user.email).includes(view.viewerEmail!),
       );
 
-      const allExcludedViews = [...hiddenTeamMembers];
+      const filteredViews = views.filter(
+        (view) =>
+          !view.isArchived &&
+          !users.map((user) => user.email).includes(view.viewerEmail!),
+      );
+
+      const allExcludedViews = [...hiddenTeamMembers, ...archivedViews];
 
       if (filteredViews.length === 0) {
         return res.status(200).json({
