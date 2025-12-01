@@ -33,35 +33,38 @@ export default function StatsCard({
     );
   }
 
+  const analyticsEnabled = stats?.analyticsEnabled ?? true;
+  const totalDurationMs = stats?.total_duration ?? 0;
+  const durationValue =
+    totalDurationMs < 60000
+      ? Math.round(totalDurationMs / 1000).toString()
+      : `${Math.floor(totalDurationMs / 60000)}:${
+          Math.round((totalDurationMs % 60000) / 1000) < 10
+            ? `0${Math.round((totalDurationMs % 60000) / 1000)}`
+            : Math.round((totalDurationMs % 60000) / 1000)
+        }`;
+  const durationUnit = totalDurationMs < 60000 ? "seconds" : "minutes";
+
   const statistics = [
     {
       name: "Number of views",
-      value: stats?.totalViews.toString() ?? "0",
+      value: (stats?.totalViews ?? 0).toString(),
       active: true,
     },
     {
       name: "Average view completion",
       value: `${stats?.avgCompletionRate ?? 0}%`,
-      active: true,
+      active: analyticsEnabled && (stats?.totalViews ?? 0) > 0,
     },
     {
       name: "Total average view duration",
-      value:
-        stats?.total_duration == null
-          ? "46"
-          : stats?.total_duration < 60000
-            ? `${Math.round(stats?.total_duration / 1000)}`
-            : `${Math.floor(stats?.total_duration / 60000)}:${
-                Math.round((stats?.total_duration % 60000) / 1000) < 10
-                  ? `0${Math.round((stats?.total_duration % 60000) / 1000)}`
-                  : Math.round((stats?.total_duration % 60000) / 1000)
-              }`,
-      unit: stats?.total_duration! < 60000 ? "seconds" : "minutes",
-      active: stats?.total_duration ? true : false,
+      value: durationValue,
+      unit: durationUnit,
+      active: analyticsEnabled && totalDurationMs > 0,
     },
   ];
 
-  return stats && stats.views.length > 0 ? (
+  return stats ? (
     <div className="grid grid-cols-1 space-y-2 border-foreground/5 sm:grid-cols-3 sm:space-x-2 sm:space-y-0 lg:grid-cols-3 lg:space-x-3">
       {statistics.map((stat, statIdx) => (
         <StatsElement key={statIdx} stat={stat} statIdx={statIdx} />

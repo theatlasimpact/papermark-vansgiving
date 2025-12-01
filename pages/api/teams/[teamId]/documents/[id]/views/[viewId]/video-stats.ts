@@ -4,9 +4,11 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getServerSession } from "next-auth/next";
 
 import prisma from "@/lib/prisma";
-import { callTinybird, TinybirdUnauthorizedError } from "@/lib/tinybird";
+import { callTinybird } from "@/lib/tinybird";
 import { getVideoEventsByView } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
+
+type AnalyticsUnavailableReason = "unauthorized" | "error" | undefined;
 
 export default async function handler(
   req: NextApiRequest,
@@ -68,31 +70,33 @@ export default async function handler(
     }
 
     let analyticsEnabled = true;
-    let response;
+    let analyticsUnavailableReason: AnalyticsUnavailableReason;
 
-    try {
-      response = await callTinybird(() =>
-        getVideoEventsByView({
-          view_id: viewId,
-          document_id: documentId,
-        }),
-      );
-    } catch (error) {
-      if (error instanceof TinybirdUnauthorizedError) {
+    const response = await callTinybird(() =>
+      getVideoEventsByView({
+        view_id: viewId,
+        document_id: documentId,
+      }),
+    );
+
+    if (!response.ok) {
+      if (response.unauthorized) {
         analyticsEnabled = false;
-        response = { data: [] } as any;
+        analyticsUnavailableReason = "unauthorized";
       } else {
-        console.error("Error fetching video stats:", error);
+        console.error("Error fetching video stats:", response.error);
         return res.status(500).json({ error: "Internal Server Error" });
       }
     }
 
-    if (!response?.data) {
-      return res.status(200).json({ data: [], analyticsEnabled });
+    if (!response.ok || !response.data?.data) {
+      return res
+        .status(200)
+        .json({ data: [], analyticsEnabled, analyticsUnavailableReason });
     }
 
     // Filter for valid events and ensure valid time ranges > 1 second
-    const validEvents = response.data.filter((event: any) =>
+    const validEvents = response.data.data.filter((event: any) =>
       (event.event_type === "played" ||
         event.event_type === "muted" ||
         event.event_type === "unmuted" ||
@@ -126,6 +130,7 @@ export default async function handler(
     return res.status(200).json({
       data: distributionArray,
       analyticsEnabled,
+      analyticsUnavailableReason,
     });
   } catch (error) {
     console.error("Error fetching video stats:", error);

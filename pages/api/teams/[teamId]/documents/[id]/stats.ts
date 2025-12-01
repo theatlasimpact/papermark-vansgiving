@@ -1,20 +1,24 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { View } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import {
   callTinybird,
-  TinybirdUnauthorizedError,
   getTotalAvgPageDuration,
   getTotalDocumentDuration,
   getViewPageDuration,
 } from "@/lib/tinybird";
 import { getVideoEventsByDocument } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
+
+type AnalyticsUnavailableReason = "unauthorized" | "error" | undefined;
+
+type PageDurationResult = {
+  data: { versionNumber: number; pageNumber: string; avg_duration: number }[];
+};
 
 export default async function handle(
   req: NextApiRequest,
@@ -123,21 +127,15 @@ export default async function handle(
           : Promise.resolve([]),
       ]);
 
-      const excludedTeamViews = views.filter((view: View) =>
-        users.some((user: { email: string | null }) =>
-          user.email !== null && user.email === view.viewerEmail,
-        ),
-      );
-
-      const archivedViews = views.filter((view) => view.isArchived === true);
-
-      const allExcludedViews = excludeMembers
-        ? [...excludedTeamViews, ...archivedViews]
-        : [...archivedViews];
-
       const filteredViews = views.filter(
-        (view) => !allExcludedViews.map((view) => view.id).includes(view.id),
+        (view) => !users.map((user) => user.email).includes(view.viewerEmail!),
       );
+
+      const hiddenTeamMembers = views.filter((view) =>
+        users.map((user) => user.email).includes(view.viewerEmail!),
+      );
+
+      const allExcludedViews = [...hiddenTeamMembers];
 
       if (filteredViews.length === 0) {
         return res.status(200).json({
@@ -150,55 +148,85 @@ export default async function handle(
         });
       }
 
-      let durationWithMs: {
-        data: { avg_duration: number; pageNumber: string; versionNumber: number }[];
-      } = { data: [] };
+      let durationWithMs: PageDurationResult = { data: [] };
       let totalDurationAverageMs = 0;
       let avgCompletionRate = 0;
       let analyticsEnabled = true;
+      let analyticsUnavailableReason: AnalyticsUnavailableReason;
 
-      try {
-        const [duration, totalDocumentDuration] = await Promise.all([
-          callTinybird(() =>
-            getTotalAvgPageDuration({
-              documentId: docId,
-              excludedLinkIds: "",
-              excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
-              since: 0,
-            }),
-          ),
-          callTinybird(() =>
-            getTotalDocumentDuration({
-              documentId: docId,
-              excludedLinkIds: "",
-              excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
-              since: 0,
-            }),
-          ),
-        ]);
+      const [durationResult, totalDocumentDurationResult] = await Promise.all([
+        callTinybird(() =>
+          getTotalAvgPageDuration({
+            documentId: docId,
+            excludedLinkIds: "",
+            excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
+            since: 0,
+          }),
+        ),
+        callTinybird(() =>
+          getTotalDocumentDuration({
+            documentId: docId,
+            excludedLinkIds: "",
+            excludedViewIds: allExcludedViews.map((view) => view.id).join(","),
+            since: 0,
+          }),
+        ),
+      ]);
 
+      const durationError = [durationResult, totalDocumentDurationResult].find(
+        (result) => !result.ok && !result.unauthorized,
+      );
+      const durationUnauthorized = [
+        durationResult,
+        totalDocumentDurationResult,
+      ].some((result) => !result.ok && result.unauthorized);
+
+      if (durationError) {
+        throw durationError.error ?? new Error("Failed to load analytics");
+      }
+
+      analyticsEnabled = !durationUnauthorized;
+      analyticsUnavailableReason = durationUnauthorized
+        ? "unauthorized"
+        : undefined;
+
+      if (durationResult.ok) {
         durationWithMs = {
-          ...duration,
-          data: duration.data.map((dataPoint) => ({
+          ...durationResult.data,
+          data: durationResult.data.data.map((dataPoint) => ({
             ...dataPoint,
             // Tinybird returns seconds; convert to milliseconds for UI consumers.
             avg_duration: dataPoint.avg_duration * 1000,
           })),
         };
+      }
 
-        if (filteredViews.length > 0) {
-          const totalDuration = totalDocumentDuration.data?.[0]?.sum_duration ?? 0;
-          totalDurationAverageMs =
-            (totalDuration * 1000) / (filteredViews.length || 1);
-        }
+      if (totalDocumentDurationResult.ok && filteredViews.length > 0) {
+        const totalDuration =
+          totalDocumentDurationResult.data?.data?.[0]?.sum_duration ?? 0;
+        totalDurationAverageMs =
+          (totalDuration * 1000) / (filteredViews.length || 1);
+      }
 
-        if (filteredViews.length > 0) {
-          if (document.type === "video") {
-            const videoEvents = await callTinybird(() =>
-              getVideoEventsByDocument({
-                document_id: docId,
-              }),
-            );
+      if (analyticsEnabled && filteredViews.length > 0) {
+        if (document.type === "video") {
+          const videoEventsResult = await callTinybird(() =>
+            getVideoEventsByDocument({
+              document_id: docId,
+            }),
+          );
+
+          if (!videoEventsResult.ok) {
+            if (videoEventsResult.unauthorized) {
+              analyticsEnabled = false;
+              analyticsUnavailableReason = "unauthorized";
+            } else {
+              throw (
+                videoEventsResult.error || new Error("Failed to fetch video events")
+              );
+            }
+          } else {
+            const videoEvents = videoEventsResult.data;
 
             const completionRates = await Promise.all(
               filteredViews.map(async (view) => {
@@ -230,16 +258,44 @@ export default async function handle(
             avgCompletionRate =
               completionRates.reduce((sum, rate) => sum + rate, 0) /
               completionRates.length;
+          }
+        } else {
+          const completionResults = await Promise.all(
+            filteredViews.map((view) =>
+              callTinybird(() =>
+                getViewPageDuration({
+                  documentId: docId,
+                  viewId: view.id,
+                  since: 0,
+                }),
+              ),
+            ),
+          );
+
+          const completionError = completionResults.find(
+            (result) => !result.ok && !result.unauthorized,
+          );
+          const completionUnauthorized = completionResults.some(
+            (result) => !result.ok && result.unauthorized,
+          );
+
+          if (completionError) {
+            throw (
+              completionError.error ||
+              new Error("Failed to fetch completion analytics")
+            );
+          }
+
+          if (completionUnauthorized) {
+            analyticsEnabled = false;
+            analyticsUnavailableReason = "unauthorized";
           } else {
             const completionRates = await Promise.all(
-              filteredViews.map(async (view) => {
-                const pageData = await callTinybird(() =>
-                  getViewPageDuration({
-                    documentId: docId,
-                    viewId: view.id,
-                    since: 0,
-                  }),
-                );
+              filteredViews.map(async (view, index) => {
+                const durationResult = completionResults[index];
+                const pageData = durationResult.ok
+                  ? durationResult.data
+                  : { data: [] };
 
                 const relevantVersion = document.versions.find(
                   (version) => version.createdAt <= view.viewedAt,
@@ -247,7 +303,9 @@ export default async function handle(
                 const numPages =
                   relevantVersion?.numPages || document.numPages || 0;
 
-                return numPages > 0 ? (pageData.data.length / numPages) * 100 : 0;
+                return numPages > 0
+                  ? (pageData.data.length / numPages) * 100
+                  : 0;
               }),
             );
 
@@ -255,15 +313,6 @@ export default async function handle(
               completionRates.reduce((sum, rate) => sum + rate, 0) /
               completionRates.length;
           }
-        }
-      } catch (durationError) {
-        if (durationError instanceof TinybirdUnauthorizedError) {
-          analyticsEnabled = false;
-          durationWithMs = { data: [] };
-          totalDurationAverageMs = 0;
-          avgCompletionRate = 0;
-        } else {
-          throw durationError;
         }
       }
 
@@ -274,6 +323,7 @@ export default async function handle(
         avgCompletionRate: Math.round(avgCompletionRate),
         totalViews: filteredViews.length,
         analyticsEnabled,
+        analyticsUnavailableReason,
       };
 
       return res.status(200).json(stats);

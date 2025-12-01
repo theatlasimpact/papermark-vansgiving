@@ -71,6 +71,7 @@ interface LinkVisitsResponse {
   visits: ViewWithDuration[];
   totalVisits: number;
   analyticsEnabled: boolean;
+  analyticsUnavailableReason?: string;
 }
 
 export function useLinkVisits(linkId: string) {
@@ -86,6 +87,7 @@ export function useLinkVisits(linkId: string) {
     visits: data?.visits ?? [],
     totalVisits: data?.totalVisits ?? 0,
     analyticsEnabled: data?.analyticsEnabled ?? true,
+    analyticsUnavailableReason: data?.analyticsUnavailableReason,
     loading: !error && !data,
     error,
   };
