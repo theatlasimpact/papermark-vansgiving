@@ -10,3 +10,5 @@ SQL >
     WHERE
         documentId = {{ String(documentId, required=True)}}
         AND viewId IN splitByChar(',', {{ String(viewIds, required=True) }})
+
+TOKEN papermark_read READ

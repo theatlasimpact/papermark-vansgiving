@@ -17,4 +17,6 @@ SCHEMA >
 
 ENGINE "MergeTree"
 ENGINE_SORTING_KEY "document_id,view_id,link_id,timestamp"
-ENGINE_PARTITION_KEY "toYYYYMM(timestamp)" 
+ENGINE_PARTITION_KEY "toYYYYMM(timestamp)"
+
+TOKEN papermark_write APPEND

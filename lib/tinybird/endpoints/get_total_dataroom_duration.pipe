@@ -15,3 +15,5 @@ SQL >
         AND viewId NOT IN {{ Array(excludedViewIds, String) }}
     GROUP BY
         viewId
+
+TOKEN papermark_read READ

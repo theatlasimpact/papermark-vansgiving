@@ -21,5 +21,4 @@ SQL >
     WHERE document_id = {{String(document_id, required=True)}}
     ORDER BY timestamp ASC
 
-
-
+TOKEN papermark_read READ

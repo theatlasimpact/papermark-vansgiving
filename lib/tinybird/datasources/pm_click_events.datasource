@@ -35,3 +35,5 @@ SCHEMA >
 ENGINE "MergeTree"
 ENGINE_PARTITION_KEY "toYYYYMM(timestamp)"
 ENGINE_SORTING_KEY "timestamp, view_id, link_id, click_id"
+
+TOKEN papermark_write APPEND

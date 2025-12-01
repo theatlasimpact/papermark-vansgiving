@@ -10,3 +10,5 @@ SQL >
     WHERE
         viewId IN splitByChar(',', {{ String(viewIds, required=true) }})
         AND time >= {{ Int64(since, required=true) }} 
+
+TOKEN papermark_read READ

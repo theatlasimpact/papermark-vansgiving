@@ -18,3 +18,5 @@ SQL >
     FROM DistinctDurations
     GROUP BY versionNumber, pageNumber
     ORDER BY versionNumber ASC, pageNumber ASC
+
+TOKEN papermark_read READ

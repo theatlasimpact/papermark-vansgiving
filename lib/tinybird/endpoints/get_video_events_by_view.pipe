@@ -21,4 +21,4 @@ SQL >
     AND view_id = {{String(view_id, required=True)}}
     ORDER BY timestamp ASC
 
-
+TOKEN papermark_read READ
