@@ -8,8 +8,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  compress: true,
+  swcMinify: true,
   images: {
     minimumCacheTTL: 2592000, // 30 days
+    formats: ["image/avif", "image/webp"],
     remotePatterns: prepareRemotePatterns(),
   },
   skipTrailingSlashRedirect: true,
@@ -43,6 +46,61 @@ const nextConfig = {
     const isDev = process.env.NODE_ENV === "development";
 
     return [
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/_next/image",
+        headers: [
+          {
+            key: "Cache-Control",
+            value:
+              "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=31536000",
+          },
+        ],
+      },
+      {
+        source: "/fonts/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/_static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/vendor/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/favicon.ico",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
       {
         // Default headers for all routes
         source: "/:path*",
