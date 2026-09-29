@@ -36,8 +36,8 @@ export function ProBannerSection({
   return (
     <div className="pb-5">
       <LinkItem
-        title="Show Secured by Papermark"
-        tooltipContent="Display 'Secured by Papermark' branding on your shared documents"
+        title="Show Atlas Impact badge"
+        tooltipContent="Display an Atlas Impact badge on the shared document. Off unless you turn it on."
         link="https://www.papermark.com/help/article/remove-papermark-branding"
         enabled={enabled}
         action={handleShowBanner}

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { mutate } from "swr";
 import z from "zod";
 
+import { publicLinkUrl } from "@/lib/brand";
 import { usePlan } from "@/lib/swr/use-billing";
 import useLimits from "@/lib/swr/use-limits";
 import { LinkWithViews, WatermarkConfig } from "@/lib/types";
@@ -678,9 +679,7 @@ export default function LinksTable({
                               )}
 
                             <div className="flex w-full whitespace-nowrap text-sm group-hover/cell:opacity-0">
-                              {link.domainId
-                                ? `https://${link.domainSlug}/${link.slug}`
-                                : `${process.env.NEXT_PUBLIC_MARKETING_URL}/view/${link.id}`}
+                              {publicLinkUrl(link)}
                             </div>
 
                             {link.domainId && isFree ? (
@@ -695,11 +694,7 @@ export default function LinksTable({
                               <button
                                 className="absolute bottom-0 left-0 right-0 top-0 z-10 hidden w-full whitespace-nowrap text-center text-xs group-hover/cell:block group-hover/cell:text-primary-foreground sm:text-sm"
                                 onClick={() =>
-                                  handleCopyToClipboard(
-                                    link.domainId
-                                      ? `https://${link.domainSlug}/${link.slug}`
-                                      : `${process.env.NEXT_PUBLIC_MARKETING_URL}/view/${link.id}`,
-                                  )
+                                  handleCopyToClipboard(publicLinkUrl(link))
                                 }
                                 title="Copy & Share"
                               >

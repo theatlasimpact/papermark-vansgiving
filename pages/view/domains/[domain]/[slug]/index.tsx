@@ -126,7 +126,7 @@ export const getStaticProps = async (context: GetStaticPropsContext) => {
             metaFavicon: link.metaFavicon || "/favicon.ico",
             metaUrl: `https://${domain}/${slug}` || null,
           },
-          showAccountCreationSlide: link.showBanner || teamPlan === "free",
+          showAccountCreationSlide: Boolean(link.showBanner),
           useAdvancedExcelViewer: advancedExcelEnabled,
           useCustomAccessForm:
             teamId === "cm0154tiv0000lr2t6nr5c6kp" ||
@@ -318,7 +318,7 @@ export default function ViewPage({
             favicon={meta.metaFavicon}
             enableBranding={meta.enableCustomMetatag ?? false}
             title={
-              meta.metaTitle ?? `${link?.document?.name} | Powered by Papermark`
+              meta.metaTitle ?? `${link?.document?.name} | Atlas Impact`
             }
             description={meta.metaDescription ?? null}
             imageUrl={meta.metaImage ?? null}
@@ -361,7 +361,7 @@ export default function ViewPage({
           favicon={meta.metaFavicon}
           enableBranding={meta.enableCustomMetatag ?? false}
           title={
-            meta.metaTitle ?? `${link?.document?.name} | Powered by Papermark`
+            meta.metaTitle ?? `${link?.document?.name} | Atlas Impact`
           }
           description={meta.metaDescription ?? null}
           imageUrl={meta.metaImage ?? null}
@@ -396,7 +396,7 @@ export default function ViewPage({
             favicon={meta.metaFavicon}
             enableBranding={meta.enableCustomMetatag ?? false}
             title={
-              meta.metaTitle ?? `${link?.dataroom?.name} | Powered by Papermark`
+              meta.metaTitle ?? `${link?.dataroom?.name} | Atlas Impact`
             }
             description={meta.metaDescription ?? null}
             imageUrl={meta.metaImage ?? null}
@@ -440,7 +440,7 @@ export default function ViewPage({
           favicon={meta.metaFavicon}
           enableBranding={meta.enableCustomMetatag ?? false}
           title={
-            meta.metaTitle ?? `${link?.dataroom?.name} | Powered by Papermark`
+            meta.metaTitle ?? `${link?.dataroom?.name} | Atlas Impact`
           }
           description={meta.metaDescription ?? null}
           imageUrl={meta.metaImage ?? null}

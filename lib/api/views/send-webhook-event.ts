@@ -1,3 +1,4 @@
+import { appBaseHost, publicLinkUrl } from "@/lib/brand";
 import prisma from "@/lib/prisma";
 import { teamHasFeature } from "@/lib/plan/guards";
 import { log } from "@/lib/utils";
@@ -65,12 +66,9 @@ export async function sendLinkViewWebhook({
     // Prepare link data for webhook
     const linkData = {
       id: link.id,
-      url: link.domainId
-        ? `https://${link.domainSlug}/${link.slug}`
-        : `https://www.papermark.com/view/${link.id}`,
-      domain:
-        link.domainId && link.domainSlug ? link.domainSlug : "papermark.com",
-      key: link.domainId && link.slug ? link.slug : `view/${link.id}`,
+      url: publicLinkUrl(link),
+      domain: link.domainSlug || appBaseHost(),
+      key: link.slug || `view/${link.id}`,
       name: link.name,
       expiresAt: link.expiresAt?.toISOString() || null,
       hasPassword: !!link.password,

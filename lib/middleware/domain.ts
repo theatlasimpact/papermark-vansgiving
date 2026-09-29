@@ -4,7 +4,7 @@ import { BLOCKED_PATHNAMES } from "@/lib/constants";
 
 export default async function DomainMiddleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const host = req.headers.get("host") ?? "";
+  const host = (req.headers.get("host") ?? "").split(":")[0];
 
   const url = req.nextUrl.clone();
 
@@ -21,8 +21,7 @@ export default async function DomainMiddleware(req: NextRequest) {
   return NextResponse.rewrite(url, {
     headers: {
       "X-Robots-Tag": "noindex",
-      "X-Powered-By":
-        "Papermark - Secure Data Room Infrastructure for the modern web",
+      "X-Powered-By": "Atlas Impact Solutions",
     },
   });
 }

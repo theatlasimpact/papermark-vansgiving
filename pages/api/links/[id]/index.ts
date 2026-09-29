@@ -7,6 +7,7 @@ import {
   fetchDataroomLinkData,
   fetchDocumentLinkData,
 } from "@/lib/api/links/link-data";
+import { resolveShareDomain } from "@/lib/links/resolve-share-domain";
 import prisma from "@/lib/prisma";
 import { teamHasPaidPlan } from "@/lib/plan/guards";
 import { canDeleteLink } from "@/lib/permissions/link";
@@ -17,7 +18,6 @@ import {
 } from "@/lib/utils";
 import { checkGlobalBlockList } from "@/lib/utils/global-block-list";
 
-import { DomainObject } from "..";
 import { authOptions } from "../../auth/[...nextauth]";
 
 export default async function handle(
@@ -230,52 +230,17 @@ export default async function handle(
 
     let { domain, slug, ...linkData } = linkDomainData;
 
-    // set domain and slug to null if the domain is papermark.com
-    if (domain && domain === "papermark.com") {
-      domain = null;
-      slug = null;
+    const resolvedDomain = await resolveShareDomain({
+      domain,
+      slug,
+      currentLinkId: id,
+    });
+    if (!resolvedDomain.ok) {
+      return res.status(400).json({ error: resolvedDomain.error });
     }
-
-    let domainObj: DomainObject | null;
-
-    if (domain && slug) {
-      domainObj = await prisma.domain.findUnique({
-        where: {
-          slug: domain,
-        },
-      });
-
-      if (!domainObj) {
-        return res.status(400).json({ error: "Domain not found." });
-      }
-
-      const currentLink = await prisma.link.findUnique({
-        where: { id: id },
-        select: {
-          id: true,
-          domainSlug: true,
-          slug: true,
-        },
-      });
-
-      // if the slug or domainSlug has changed, check if the new slug is unique
-      if (currentLink?.slug !== slug || currentLink?.domainSlug !== domain) {
-        const existingLink = await prisma.link.findUnique({
-          where: {
-            domainSlug_slug: {
-              slug: slug,
-              domainSlug: domain,
-            },
-          },
-        });
-
-        if (existingLink) {
-          return res.status(400).json({
-            error: "The link already exists.",
-          });
-        }
-      }
-    }
+    domain = resolvedDomain.value.domain;
+    slug = resolvedDomain.value.slug;
+    const domainId = resolvedDomain.value.domainId;
 
     if (linkData.enableAgreement && !linkData.agreementId) {
       return res.status(400).json({
@@ -322,7 +287,7 @@ export default async function handle(
           allowList: linkData.allowList,
           denyList: linkData.denyList,
           expiresAt: exat,
-          domainId: domainObj?.id || null,
+          domainId: domainId,
           domainSlug: domain || null,
           slug: slug || null,
           enableIndexFile: linkData.enableIndexFile || false,

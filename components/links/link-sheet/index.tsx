@@ -51,7 +51,7 @@ import TagSection from "./tags/tag-section";
 export const DEFAULT_LINK_PROPS = (
   linkType: LinkType,
   groupId: string | null = null,
-  showBanner: boolean = true,
+  showBanner: boolean = false,
 ) => ({
   id: null,
   name: null,

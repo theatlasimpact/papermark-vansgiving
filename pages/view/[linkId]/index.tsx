@@ -11,6 +11,7 @@ import { ExtendedRecordMap } from "notion-types";
 import { parsePageId } from "notion-utils";
 import z from "zod";
 
+import { appBaseUrl } from "@/lib/brand";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import notion from "@/lib/notion";
 import { addSignedUrls } from "@/lib/notion/utils";
@@ -147,10 +148,10 @@ export const getStaticProps = async (context: GetStaticPropsContext) => {
             metaDescription: link.metaDescription,
             metaImage: link.metaImage,
             metaFavicon: link.metaFavicon ?? "/favicon.ico",
-            metaUrl: `https://www.papermark.com/view/${linkId}`,
+            metaUrl: `${appBaseUrl()}/view/${linkId}`,
           },
-          showPoweredByBanner: link.showBanner || teamPlan === "free",
-          showAccountCreationSlide: link.showBanner || teamPlan === "free",
+          showPoweredByBanner: Boolean(link.showBanner),
+          showAccountCreationSlide: Boolean(link.showBanner),
           useAdvancedExcelViewer: advancedExcelEnabled,
           useCustomAccessForm:
             teamId === "cm0154tiv0000lr2t6nr5c6kp" ||
@@ -227,7 +228,7 @@ export const getStaticProps = async (context: GetStaticPropsContext) => {
             metaDescription: link.metaDescription,
             metaImage: link.metaImage,
             metaFavicon: link.metaFavicon ?? "/favicon.ico",
-            metaUrl: `https://www.papermark.com/view/${linkId}`,
+            metaUrl: `${appBaseUrl()}/view/${linkId}`,
           },
           showPoweredByBanner: false,
           showAccountCreationSlide: false,
@@ -334,7 +335,7 @@ export default function ViewPage({
             favicon={meta.metaFavicon}
             enableBranding={meta.enableCustomMetatag ?? false}
             title={
-              meta.metaTitle ?? `${link?.document?.name} | Powered by Papermark`
+              meta.metaTitle ?? `${link?.document?.name} | Atlas Impact`
             }
             description={meta.metaDescription ?? null}
             imageUrl={meta.metaImage ?? null}
@@ -378,7 +379,7 @@ export default function ViewPage({
           favicon={meta.metaFavicon}
           enableBranding={meta.enableCustomMetatag ?? false}
           title={
-            meta.metaTitle ?? `${link?.document?.name} | Powered by Papermark`
+            meta.metaTitle ?? `${link?.document?.name} | Atlas Impact`
           }
           description={meta.metaDescription ?? null}
           imageUrl={meta.metaImage ?? null}
@@ -415,7 +416,7 @@ export default function ViewPage({
             favicon={meta.metaFavicon}
             enableBranding={meta.enableCustomMetatag ?? false}
             title={
-              meta.metaTitle ?? `${link?.dataroom?.name} | Powered by Papermark`
+              meta.metaTitle ?? `${link?.dataroom?.name} | Atlas Impact`
             }
             description={meta.metaDescription ?? null}
             imageUrl={meta.metaImage ?? null}
@@ -459,7 +460,7 @@ export default function ViewPage({
           favicon={meta.metaFavicon}
           enableBranding={meta.enableCustomMetatag ?? false}
           title={
-            meta.metaTitle ?? `${link?.dataroom?.name} | Powered by Papermark`
+            meta.metaTitle ?? `${link?.dataroom?.name} | Atlas Impact`
           }
           description={meta.metaDescription ?? null}
           imageUrl={meta.metaImage ?? null}

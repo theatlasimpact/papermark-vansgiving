@@ -59,7 +59,7 @@ import { PermissionsSheet } from "./permissions-sheet";
 export const DEFAULT_LINK_PROPS = (
   linkType: LinkType,
   groupId: string | null = null,
-  showBanner: boolean = true,
+  showBanner: boolean = false,
 ) => ({
   ...BASE_DEFAULT_LINK_PROPS(linkType, groupId, showBanner),
   permissions: null,

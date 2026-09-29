@@ -9,20 +9,22 @@ import { LogoCloud } from "@/components/shared/logo-cloud";
 import { Button } from "@/components/ui/button";
 
 const data = {
-  description: "Verify login to Papermark",
-  title: "Verify | Papermark",
+  description: "Verify login to Atlas Impact",
+  title: "Verify | Atlas Impact",
   url: "/verify",
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.papermark.com"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_BASE_URL || "https://share.theatlasimpact.com",
+  ),
   title: data.title,
   description: data.description,
   openGraph: {
     title: data.title,
     description: data.description,
     url: data.url,
-    siteName: "Papermark",
+    siteName: "Atlas Impact",
     images: [
       {
         url: "/_static/meta-image.png",
@@ -37,7 +39,6 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: data.title,
     description: data.description,
-    creator: "@papermarkio",
     images: ["/_static/meta-image.png"],
   },
 };
@@ -79,11 +80,9 @@ export default function VerifyPage({
         ></div>
         <div className="z-10 mx-5 mt-[calc(1vh)] h-fit w-full max-w-md overflow-hidden rounded-lg sm:mx-0 sm:mt-[calc(2vh)] md:mt-[calc(3vh)]">
           <div className="items-left flex flex-col space-y-3 px-4 py-6 pt-8 sm:px-12">
-            <img
-              src="/_static/papermark-logo.svg"
-              alt="Papermark Logo"
-              className="-mt-8 mb-36 h-7 w-auto self-start sm:mb-32 md:mb-48"
-            />
+            <p className="-mt-8 mb-36 text-2xl font-semibold tracking-tight text-gray-900 sm:mb-32 md:mb-48">
+              Atlas Impact
+            </p>
             <Link href="/">
               <span className="text-balance text-3xl font-semibold text-gray-900">
                 Verify your login
@@ -103,24 +102,7 @@ export default function VerifyPage({
             </div>
           </div>
           <p className="mt-10 w-full max-w-md px-4 text-xs text-muted-foreground sm:px-12">
-            By clicking continue, you acknowledge that you have read and agree
-            to Papermark&apos;s{" "}
-            <a
-              href={`${process.env.NEXT_PUBLIC_MARKETING_URL}/terms`}
-              target="_blank"
-              className="underline"
-            >
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a
-              href={`${process.env.NEXT_PUBLIC_MARKETING_URL}/privacy`}
-              target="_blank"
-              className="underline"
-            >
-              Privacy Policy
-            </a>
-            .
+            You are signing in to Atlas Impact Solutions.
           </p>
         </div>
       </div>

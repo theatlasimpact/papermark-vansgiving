@@ -2,6 +2,7 @@ import { JSXElementConstructor, ReactElement } from "react";
 import { render, toPlainText } from "@react-email/render";
 import { Resend } from "resend";
 import type { SendVerificationRequestParams } from "next-auth/providers/email";
+import { BRAND_LEGAL_NAME, BRAND_NAME, emailFromAddress, emailReplyToAddress } from "@/lib/brand";
 import { log, nanoid } from "@/lib/utils";
 
 export const resend = process.env.RESEND_API_KEY
@@ -13,7 +14,7 @@ export const sendEmail = async ({
   subject,
   react,
   from,
-  marketing,
+  marketing: _marketing,
   system,
   verify,
   test,
@@ -42,18 +43,14 @@ export const sendEmail = async ({
   const html = await render(react);
   const plainText = toPlainText(html);
 
-  const fromAddress =
-    from ??
-    (marketing
-      ? "Vansgiving <hello@joinvansgiving.com>"
-      : "Vansgiving <login@joinvansgiving.com>");
+  const fromAddress = from ?? emailFromAddress();
 
   try {
     const { data, error } = await resend.emails.send({
       from: fromAddress,
       to: test ? "delivered@resend.dev" : to,
       cc,
-      replyTo: replyTo ?? "hello@joinvansgiving.com",
+      replyTo: replyTo ?? emailReplyToAddress(),
       subject,
       react,
       scheduledAt,
@@ -95,17 +92,16 @@ export async function sendVerificationRequest(
 
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Force a verified Vansgiving sender for login links
-  const fromAddress = "Vansgiving Sponsor Deck <login@joinvansgiving.com>";
-  const replyToAddress = "hello@joinvansgiving.com";
+  const fromAddress = emailFromAddress();
+  const replyToAddress = emailReplyToAddress();
 
   const loginUrl = url;
   const host = new URL(loginUrl).host;
 
   const html = `
     <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.5; color: #111827;">
-      <h1 style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">Your Papermark Login Link</h1>
-      <p style="margin-bottom: 16px;">Click the button below to sign in to your Papermark account.</p>
+      <h1 style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">Your ${BRAND_NAME} login link</h1>
+      <p style="margin-bottom: 16px;">Click the button below to sign in to ${BRAND_LEGAL_NAME}.</p>
       <p style="margin-bottom: 24px;">
         <a href="${loginUrl}" style="display: inline-block; padding: 10px 18px; border-radius: 999px; background: #111827; color: #ffffff; text-decoration: none; font-weight: 600;">
           Sign in
