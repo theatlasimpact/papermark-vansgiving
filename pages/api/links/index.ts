@@ -5,6 +5,7 @@ import { waitUntil } from "@vercel/functions";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { resolveShareDomain } from "@/lib/links/resolve-share-domain";
 import prisma from "@/lib/prisma";
 import { CustomUser, WatermarkConfigSchema } from "@/lib/types";
 import {
@@ -73,40 +74,13 @@ export default async function handler(
 
       let { domain, slug, ...linkData } = linkDomainData;
 
-      // set domain and slug to null if the domain is papermark.com
-      if (domain && domain === "papermark.com") {
-        domain = null;
-        slug = null;
+      const resolvedDomain = await resolveShareDomain({ domain, slug });
+      if (!resolvedDomain.ok) {
+        return res.status(400).json({ error: resolvedDomain.error });
       }
-
-      let domainObj: DomainObject | null;
-
-      if (domain && slug) {
-        domainObj = await prisma.domain.findUnique({
-          where: {
-            slug: domain,
-          },
-        });
-
-        if (!domainObj) {
-          return res.status(400).json({ error: "Domain not found." });
-        }
-
-        const existingLink = await prisma.link.findUnique({
-          where: {
-            domainSlug_slug: {
-              slug: slug,
-              domainSlug: domain,
-            },
-          },
-        });
-
-        if (existingLink) {
-          return res.status(400).json({
-            error: "The link already exists.",
-          });
-        }
-      }
+      domain = resolvedDomain.value.domain;
+      slug = resolvedDomain.value.slug;
+      const domainId = resolvedDomain.value.domainId;
 
       if (linkData.enableAgreement && !linkData.agreementId) {
         return res.status(400).json({
@@ -162,7 +136,7 @@ export default async function handler(
             emailAuthenticated: linkData.emailAuthenticated,
             expiresAt: exat,
             allowDownload: linkData.allowDownload,
-            domainId: domainObj?.id || null,
+            domainId: domainId,
             domainSlug: domain || null,
             slug: slug || null,
             enableIndexFile: enableIndexFile,

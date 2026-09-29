@@ -1,10 +1,13 @@
 import { Dub } from "dub";
 
-export const dub = new Dub({
-  token: process.env.DUB_API_KEY,
-});
+export const dub = process.env.DUB_API_KEY
+  ? new Dub({
+      token: process.env.DUB_API_KEY,
+    })
+  : null;
 
 export async function getDubDiscountForExternalUserId(externalId: string) {
+  if (!dub) return null;
   try {
     const customers = await dub.customers.list({
       externalId,

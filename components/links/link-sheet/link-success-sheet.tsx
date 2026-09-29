@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { publicLinkUrl } from "@/lib/brand";
 import { LinkWithViews } from "@/lib/types";
 
 import { Badge } from "@/components/ui/badge";
@@ -47,10 +48,7 @@ export default function LinkSuccessSheet({
 }: LinkSuccessSheetProps) {
   const [copied, setCopied] = useState(false);
 
-  const linkUrl =
-    link.domainId && link.slug
-      ? `https://${link.domainSlug}/${link.slug}`
-      : `${process.env.NEXT_PUBLIC_MARKETING_URL}/view/${link.id}`;
+  const linkUrl = publicLinkUrl(link);
 
   const copyToClipboard = async () => {
     try {

@@ -1,12 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { useState } from "react";
 
-import PapermarkLogo from "@/public/_static/papermark-logo.svg";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -14,7 +12,13 @@ import LinkedIn from "@/components/shared/icons/linkedin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function Register() {
+export default function Register({
+  googleEnabled = false,
+  linkedInEnabled = false,
+}: {
+  googleEnabled?: boolean;
+  linkedInEnabled?: boolean;
+}) {
   const { next } = useParams as { next?: string };
 
   const [email, setEmail] = useState<string>("");
@@ -35,13 +39,8 @@ export default function Register() {
       </div>
       <div className="z-10 mx-5 mt-[calc(20vh)] h-fit w-full max-w-md overflow-hidden rounded-lg border border-border bg-gray-50 dark:bg-gray-900 sm:mx-0 sm:shadow-xl">
         <div className="flex flex-col items-center justify-center space-y-3 px-4 py-6 pt-8 text-center sm:px-16">
-          <Link href="/">
-            <Image
-              src={PapermarkLogo}
-              width={119}
-              height={32}
-              alt="Papermark Logo"
-            />
+          <Link href="/" className="text-2xl font-semibold tracking-tight">
+            Atlas Impact
           </Link>
           <h3 className="text-2xl font-medium text-foreground">
             Start sharing documents
@@ -73,8 +72,11 @@ export default function Register() {
           />
           <Button type="submit">Continue with Email</Button>
         </form>
-        <p className="text-center">or</p>
+        {googleEnabled || linkedInEnabled ? (
+          <p className="text-center">or</p>
+        ) : null}
         <div className="flex flex-col space-y-2 px-4 py-8 sm:px-16">
+          {googleEnabled ? (
           <Button
             onClick={() => {
               signIn("google", {
@@ -93,6 +95,8 @@ export default function Register() {
             </svg>
             <span>Continue with Google</span>
           </Button>
+          ) : null}
+          {linkedInEnabled ? (
           <Button
             onClick={() => {
               signIn("linkedin", {
@@ -104,6 +108,7 @@ export default function Register() {
             <LinkedIn />
             <span>Continue with LinkedIn</span>
           </Button>
+          ) : null}
         </div>
       </div>
     </div>

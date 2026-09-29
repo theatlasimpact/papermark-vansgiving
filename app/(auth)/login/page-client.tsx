@@ -16,12 +16,17 @@ import { LastUsed, useLastUsed } from "@/components/hooks/useLastUsed";
 import Google from "@/components/shared/icons/google";
 import LinkedIn from "@/components/shared/icons/linkedin";
 import Passkey from "@/components/shared/icons/passkey";
-import { LogoCloud } from "@/components/shared/logo-cloud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default function Login() {
+export default function Login({
+  googleEnabled = false,
+  linkedInEnabled = false,
+}: {
+  googleEnabled?: boolean;
+  linkedInEnabled?: boolean;
+}) {
   const { next } = useParams as { next?: string };
 
   const [lastUsed, setLastUsed] = useLastUsed();
@@ -56,18 +61,13 @@ export default function Login() {
         ></div>
         <div className="z-10 mx-5 mt-[calc(1vh)] h-fit w-full max-w-md overflow-hidden rounded-lg sm:mx-0 sm:mt-[calc(2vh)] md:mt-[calc(3vh)]">
           <div className="items-left flex flex-col space-y-3 px-4 py-6 pt-8 sm:px-12">
-            <img
-              src="/_static/papermark-logo.svg"
-              alt="Papermark Logo"
-              className="md:mb-48s -mt-8 mb-36 h-7 w-auto self-start sm:mb-32"
-            />
             <Link href="/">
               <span className="text-balance text-3xl font-semibold text-gray-900">
-                Welcome to Papermark
+                Atlas Impact
               </span>
             </Link>
             <h3 className="text-balance text-sm text-gray-800">
-              Share documents. Not attachments.
+              Tracked links for decks, quotes, contracts, and data rooms.
             </h3>
           </div>
           <form
@@ -136,8 +136,11 @@ export default function Login() {
               {lastUsed === "credentials" && <LastUsed />}
             </div>
           </form>
-          <p className="py-4 text-center">or</p>
+          {googleEnabled || linkedInEnabled || isPasskeyEnabled ? (
+            <p className="py-4 text-center">or</p>
+          ) : null}
           <div className="flex flex-col space-y-2 px-4 sm:px-12">
+            {googleEnabled ? (
             <div className="relative">
               <Button
                 onClick={() => {
@@ -160,6 +163,8 @@ export default function Login() {
                 )}
               </Button>
             </div>
+            ) : null}
+            {linkedInEnabled ? (
             <div className="relative">
               <Button
                 onClick={() => {
@@ -182,6 +187,7 @@ export default function Login() {
                 )}
               </Button>
             </div>
+            ) : null}
             {isPasskeyEnabled && (
               <div className="relative">
                 <Button
@@ -208,24 +214,7 @@ export default function Login() {
             )}
           </div>
           <p className="mt-10 w-full max-w-md px-4 text-xs text-muted-foreground sm:px-12">
-            By clicking continue, you acknowledge that you have read and agree
-            to Papermark&apos;s{" "}
-            <a
-              href={`${process.env.NEXT_PUBLIC_MARKETING_URL}/terms`}
-              target="_blank"
-              className="underline"
-            >
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a
-              href={`${process.env.NEXT_PUBLIC_MARKETING_URL}/privacy`}
-              target="_blank"
-              className="underline"
-            >
-              Privacy Policy
-            </a>
-            .
+            You are signing in to Atlas Impact Solutions.
           </p>
         </div>
       </div>
@@ -241,46 +230,15 @@ export default function Login() {
               style={{ height: "66.6666%" }}
             >
               {/* Image container */}
-              <div className="mb-4 h-64 w-80">
-                <img
-                  className="h-full w-full rounded-2xl object-cover shadow-2xl"
-                  src="/_static/testimonials/backtrace.jpeg"
-                  alt="Backtrace Capital"
-                />
+              <div className="max-w-xl px-8 text-center">
+                <p className="text-balance text-3xl font-semibold tracking-tight text-white">
+                  Atlas Impact Solutions
+                </p>
+                <p className="mt-4 text-balance text-lg font-normal leading-8 text-white/80">
+                  Send a tracked link instead of an attachment. See who opened
+                  the Mater Dei deck, a quote, or a data room.
+                </p>
               </div>
-              {/* Text content */}
-              <div className="max-w-xl text-center">
-                <blockquote className="text-balance font-normal leading-8 text-white sm:text-xl sm:leading-9">
-                  <p>
-                    &quot;We raised our €30M Fund with Papermark Data Rooms.
-                    Love the customization, security and ease of use.&quot;
-                  </p>
-                </blockquote>
-                <figcaption className="mt-4">
-                  <div className="text-balance font-normal text-white">
-                    Michael Münnix
-                  </div>
-                  <div className="text-balance font-light text-gray-400">
-                    Partner, Backtrace Capital
-                  </div>
-                </figcaption>
-              </div>
-            </div>
-            {/* White block with logos bottom 1/3, full width/height */}
-            <div
-              className="absolute bottom-0 left-0 flex w-full flex-col items-center justify-center bg-white"
-              style={{ height: "33.3333%" }}
-            >
-              <div className="mb-4 max-w-xl text-balance text-center font-semibold text-gray-900">
-                Trusted by teams at
-              </div>
-              <LogoCloud />
-              {/* <img
-                src="https://assets.papermark.io/upload/file_7JEGY7zM9ZTfmxu8pe7vWj-Screenshot-2025-05-09-at-18.09.13.png"
-                alt="Trusted teams illustration"
-                className="mt-4 max-w-full h-auto object-contain"
-                style={{maxHeight: '120px'}}
-              /> */}
             </div>
           </div>
         </div>

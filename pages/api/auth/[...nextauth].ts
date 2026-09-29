@@ -18,6 +18,7 @@ import { CreateUserEmailProps, CustomUser } from "@/lib/types";
 import { subscribe } from "@/lib/unsend";
 import { log } from "@/lib/utils";
 import { getIpAddress } from "@/lib/utils/ip";
+import { emailFromAddress } from "@/lib/brand";
 import { sendWelcomeEmail } from "@/lib/emails/send-welcome";
 import { sendVerificationRequest } from "@/lib/resend";
 import { isUnrestrictedAdmin } from "@/lib/super-admin";
@@ -27,35 +28,46 @@ const VERCEL_DEPLOYMENT = !!process.env.VERCEL_URL;
 const hankoTenant = getHankoTenant();
 
 const providers: Provider[] = [
-  GoogleProvider({
-    clientId: process.env.GOOGLE_CLIENT_ID as string,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    allowDangerousEmailAccountLinking: true,
-  }),
-  LinkedInProvider({
-    clientId: process.env.LINKEDIN_CLIENT_ID as string,
-    clientSecret: process.env.LINKEDIN_CLIENT_SECRET as string,
-    authorization: {
-      params: { scope: "openid profile email" },
-    },
-    issuer: "https://www.linkedin.com/oauth",
-    jwks_endpoint: "https://www.linkedin.com/oauth/openid/jwks",
-    profile(profile, tokens) {
-      const defaultImage = "https://cdn-icons-png.flaticon.com/512/174/174857.png";
-      return {
-        id: profile.sub,
-        name: profile.name,
-        email: profile.email,
-        image: profile.picture ?? defaultImage,
-      };
-    },
-    allowDangerousEmailAccountLinking: true,
-  }),
   EmailProvider({
-    from: "Vansgiving Sponsor Deck <login@joinvansgiving.com>",
+    from: emailFromAddress(),
     sendVerificationRequest,
   }),
 ];
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
+    }),
+  );
+}
+
+if (process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET) {
+  providers.push(
+    LinkedInProvider({
+      clientId: process.env.LINKEDIN_CLIENT_ID,
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+      authorization: {
+        params: { scope: "openid profile email" },
+      },
+      issuer: "https://www.linkedin.com/oauth",
+      jwks_endpoint: "https://www.linkedin.com/oauth/openid/jwks",
+      profile(profile) {
+        const defaultImage =
+          "https://cdn-icons-png.flaticon.com/512/174/174857.png";
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture ?? defaultImage,
+        };
+      },
+      allowDangerousEmailAccountLinking: true,
+    }),
+  );
+}
 
 if (hankoTenant) {
   providers.push(
@@ -214,7 +226,7 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
 
         if (message.isNewUser) {
           const { dub_id } = req.cookies;
-          if (dub_id && process.env.DUB_API_KEY) {
+          if (dub_id && dub) {
             try {
               await dub.track.lead({
                 clickId: dub_id,

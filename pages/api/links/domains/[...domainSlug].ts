@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/links/link-data";
 import prisma from "@/lib/prisma";
 import { log } from "@/lib/utils";
+import { linkLookupDomain } from "@/lib/brand";
 import { isUnrestrictedAdmin } from "@/lib/super-admin";
 import { checkGlobalBlockList } from "@/lib/utils/global-block-list";
 
@@ -23,8 +24,8 @@ export default async function handle(
     // GET /api/links/domains/:domain/:slug
     const { domainSlug } = req.query as { domainSlug: string[] };
 
-    const domain = domainSlug[0];
-    const slug = domainSlug[1];
+    const domain = linkLookupDomain(domainSlug[0]);
+    const slug = domainSlug[1]?.toLowerCase();
     const documentId = domainSlug[3];
 
     if (slug === "404") {

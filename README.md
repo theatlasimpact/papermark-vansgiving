@@ -1,3 +1,9 @@
+# Atlas Impact Solutions
+
+This repository is Atlas Impact's self-hosted document sharing app, for links such as `share.theatlasimpact.com/mater-dei-gym-energy`.
+
+Start with [SETUP.md](./SETUP.md). It lists the accounts, env var names, and DNS records. The software is a modified copy of Papermark (AGPL-3.0). Copyright for the original program remains with Papermark, Inc. See `LICENSE`.
+
 <div align="center">
   <h1 align="center">Papermark</h1>
   <h3>The open-source DocSend alternative.</h3>

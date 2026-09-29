@@ -13,20 +13,22 @@ import InvitationStatusContent from "./InvitationStatusContent";
 import CleanUrlOnExpire from "./status/ClientRedirect";
 
 const data = {
-  description: "Accept your team invitation on Papermark",
-  title: "Accept Invitation | Papermark",
+  description: "Accept your team invitation on Atlas Impact",
+  title: "Accept Invitation | Atlas Impact",
   url: "/verify/invitation",
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.papermark.com"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_BASE_URL || "https://share.theatlasimpact.com",
+  ),
   title: data.title,
   description: data.description,
   openGraph: {
     title: data.title,
     description: data.description,
     url: data.url,
-    siteName: "Papermark",
+    siteName: "Atlas Impact",
     images: [
       {
         url: "/_static/meta-image.png",
@@ -41,7 +43,6 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: data.title,
     description: data.description,
-    creator: "@papermarkio",
     images: ["/_static/meta-image.png"],
   },
 };
@@ -100,13 +101,13 @@ export default async function VerifyInvitationPage({
             <div className="flex flex-col items-center justify-center space-y-3 px-4 py-6 pt-8 text-center sm:px-16">
               <Link href="/">
                 <span className="text-balance text-2xl font-semibold text-gray-800">
-                  Welcome to Papermark
+                  Welcome to Atlas Impact
                 </span>
               </Link>
               {!isExpired && !isRevoked && (
                 <>
                   <h3 className="text-balance py-1 text-sm font-normal text-gray-800">
-                    You&apos;ve been invited to join a team on Papermark
+                    You&apos;ve been invited to join a team on Atlas Impact
                   </h3>
                   <div className="mt-2 flex w-auto items-center justify-center gap-2 rounded-full bg-gray-50 px-5 py-2.5 text-sm text-gray-600 shadow-sm">
                     <MailIcon className="h-4 w-4 text-gray-400" />

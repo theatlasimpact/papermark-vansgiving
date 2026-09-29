@@ -3,6 +3,8 @@ import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import AppMiddleware from "@/lib/middleware/app";
 import DomainMiddleware from "@/lib/middleware/domain";
 
+import { isDeploymentHost, isViewerSlugPath } from "@/lib/brand";
+
 import { BLOCKED_PATHNAMES } from "./lib/constants";
 import IncomingWebhookMiddleware, {
   isWebhookPath,
@@ -17,20 +19,6 @@ function isAnalyticsPath(path: string) {
   const pattern = /^\/ingest\/.*/;
 
   return pattern.test(path);
-}
-
-function isCustomDomain(host: string) {
-  return (
-    (process.env.NODE_ENV === "development" &&
-      (host?.includes(".local") || host?.includes("papermark.dev"))) ||
-    (process.env.NODE_ENV !== "development" &&
-      !(
-        host?.includes("localhost") ||
-        host?.includes("papermark.io") ||
-        host?.includes("papermark.com") ||
-        host?.endsWith(".vercel.app")
-      ))
-  );
 }
 
 export const config = {
@@ -60,12 +48,18 @@ export default async function middleware(req: NextRequest, ev: NextFetchEvent) {
     return IncomingWebhookMiddleware(req);
   }
 
-  // For custom domains, we need to handle them differently
-  if (isCustomDomain(host || "")) {
+  // A host that is not this deployment is a link-only custom domain.
+  // On the share host itself, /mater-dei-gym-energy is a document link and
+  // /dashboard stays the app.
+  if (!isDeploymentHost(host || "")) {
     return DomainMiddleware(req);
   }
 
-  // Handle standard papermark.io paths
+  if (isViewerSlugPath(path)) {
+    return DomainMiddleware(req);
+  }
+
+  // Handle standard app paths
   if (
     !path.startsWith("/view/") &&
     !path.startsWith("/verify") &&

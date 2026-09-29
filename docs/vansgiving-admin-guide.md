@@ -1,5 +1,9 @@
 # Vansgiving Admin Overrides & Trigger.dev Notes
 
+The current setup for Atlas Impact is in [SETUP.md](../SETUP.md). This file is older notes from the Vansgiving host (`sponsor.joinvansgiving.com`).
+
+
+
 ## Always-allowed sponsor domain
 - `sponsor.joinvansgiving.com` is automatically accepted and marked valid for the admin user `van@theatlasimpact.com`.
 - API-side validation skips DNS/Vercel checks and stores the domain as verified immediately. UI verification cards will always show **Valid Configuration** for this domain.

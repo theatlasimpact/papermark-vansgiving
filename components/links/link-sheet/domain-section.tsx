@@ -7,6 +7,11 @@ import { PlanEnum } from "@/ee/stripe/constants";
 import { Domain } from "@prisma/client";
 import { mutate } from "swr";
 
+import {
+  appBaseHost,
+  isAppShareHost,
+  supportsReadableSlug,
+} from "@/lib/brand";
 import { BLOCKED_PATHNAMES } from "@/lib/constants";
 import { BasePlan, usePlan } from "@/lib/swr/use-billing";
 import useLimits from "@/lib/swr/use-limits";
@@ -39,9 +44,10 @@ export default function DomainSection({
   linkType: "DOCUMENT_LINK" | "DATAROOM_LINK";
   editLink?: boolean;
 }) {
+  const shareHost = appBaseHost();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  const [displayValue, setDisplayValue] = useState<string>("papermark.com");
+  const [displayValue, setDisplayValue] = useState<string>(shareHost);
   const teamInfo = useTeam();
   const { limits } = useLimits();
 
@@ -62,7 +68,7 @@ export default function DomainSection({
 
   // Check if we're editing a link with a custom domain
   const isEditingCustomDomain =
-    editLink && data.domain && data.domain !== "papermark.com" ? true : false;
+    editLink && data.domain && data.domain !== shareHost ? true : false;
 
   const handleDomainChange = (value: string) => {
     const canChangeCustomDomain =
@@ -71,20 +77,20 @@ export default function DomainSection({
         : canUseCustomDomainForDataroom;
 
     if (isEditingCustomDomain && !canChangeCustomDomain) {
-      setDisplayValue(data.domain ?? "papermark.com");
+      setDisplayValue(data.domain ?? shareHost);
       return;
     }
 
     // Handle opening the add domain modal
     if (value === "add_domain" || value === "add_dataroom_domain") {
       setModalOpen(true);
-      setData({ ...data, domain: "papermark.com" });
-      setDisplayValue("papermark.com");
+      setData({ ...data, domain: shareHost });
+      setDisplayValue(shareHost);
       return;
     }
 
     // Check if this is a custom domain selection (not papermark.com)
-    if (value !== "papermark.com") {
+    if (value !== shareHost) {
       // Show upgrade modal if user doesn't have the right plan
       if (
         !isSelfHosted &&
@@ -92,8 +98,8 @@ export default function DomainSection({
           (linkType === "DATAROOM_LINK" && !canUseCustomDomainForDataroom))
       ) {
         setUpgradeModalOpen(true);
-        setData({ ...data, domain: "papermark.com" });
-        setDisplayValue("papermark.com");
+        setData({ ...data, domain: shareHost });
+        setDisplayValue(shareHost);
         return;
       }
     }
@@ -109,8 +115,8 @@ export default function DomainSection({
   };
 
   useEffect(() => {
-    if (domains && !editLink) {
-      const defaultDomain = domains.find((domain) => domain.isDefault);
+    if (!editLink) {
+      const defaultDomain = domains?.find((domain) => domain.isDefault);
 
       // Only set a custom domain if the plan allows it
       const canUseCustomDomain =
@@ -118,8 +124,8 @@ export default function DomainSection({
         (linkType === "DATAROOM_LINK" && canUseCustomDomainForDataroom);
 
       const domainValue = canUseCustomDomain
-        ? (defaultDomain?.slug ?? "papermark.com")
-        : "papermark.com";
+        ? (defaultDomain?.slug ?? shareHost)
+        : shareHost;
 
       setData({
         ...data,
@@ -140,11 +146,11 @@ export default function DomainSection({
 
   // Set defaultDomain based on plan type and link type
   const defaultDomain = editLink
-    ? (data.domain ?? "papermark.com")
+    ? (data.domain ?? shareHost)
     : (linkType === "DOCUMENT_LINK" && canUseCustomDomainForDocument) ||
         (linkType === "DATAROOM_LINK" && canUseCustomDomainForDataroom)
-      ? (domains?.find((domain) => domain.isDefault)?.slug ?? "papermark.com")
-      : "papermark.com";
+      ? (domains?.find((domain) => domain.isDefault)?.slug ?? shareHost)
+      : shareHost;
 
   // Set the initial display value when component mounts
   useEffect(() => {
@@ -174,7 +180,7 @@ export default function DomainSection({
           <SelectTrigger
             className={cn(
               "flex h-10 w-full rounded-none rounded-l-md border border-input bg-white text-foreground placeholder-muted-foreground focus:border-muted-foreground focus:outline-none focus:ring-inset focus:ring-muted-foreground dark:border-gray-500 dark:bg-gray-800 focus:dark:bg-transparent sm:text-sm",
-              data.domain && data.domain !== "papermark.com"
+              supportsReadableSlug(data.domain)
                 ? ""
                 : "border-r-1 rounded-r-md",
             )}
@@ -182,8 +188,8 @@ export default function DomainSection({
             <SelectValue placeholder="Select a domain" />
           </SelectTrigger>
           <SelectContent className="flex w-full rounded-md border border-input bg-white text-foreground placeholder-muted-foreground focus:border-muted-foreground focus:outline-none focus:ring-inset focus:ring-muted-foreground dark:border-gray-500 dark:bg-gray-800 focus:dark:bg-transparent sm:text-sm">
-            <SelectItem value="papermark.com" className="hover:bg-muted">
-              papermark.com
+            <SelectItem value={shareHost} className="hover:bg-muted">
+              {shareHost}
             </SelectItem>
             {linkType === "DOCUMENT_LINK" && (
               <>
@@ -236,14 +242,14 @@ export default function DomainSection({
           </SelectContent>
         </Select>
 
-        {data.domain && data.domain !== "papermark.com" ? (
+        {supportsReadableSlug(data.domain) ? (
           <Input
             type="text"
             name="key"
             required
             value={data.slug || ""}
             disabled={isDisabled}
-            pattern="^[a-zA-Z0-9-]+$"
+            pattern="^[a-z0-9]+(?:-[a-z0-9]+)*$"
             onKeyDown={(e) => {
               // Allow navigation keys, backspace, delete, etc.
               if (e.key.length === 1 && !/^[a-zA-Z0-9-]$/.test(e.key)) {
@@ -267,14 +273,16 @@ export default function DomainSection({
             autoComplete="off"
             className={cn(
               "hidden rounded-l-none focus:ring-inset",
-              data.domain && data.domain !== "papermark.com" ? "flex" : "",
+              supportsReadableSlug(data.domain) ? "flex" : "",
               isDisabled ? "opacity-50" : "",
             )}
-            placeholder="deck"
+            placeholder="mater-dei-gym-energy"
             onChange={(e) => {
               if (isDisabled) return;
 
-              const currentValue = e.target.value.replace(/[^a-zA-Z0-9-]/g, "");
+              const currentValue = e.target.value
+                .toLowerCase()
+                .replace(/[^a-z0-9-]/g, "");
               const isBlocked = BLOCKED_PATHNAMES.includes(`/${currentValue}`);
 
               if (isBlocked) {
@@ -291,6 +299,12 @@ export default function DomainSection({
         ) : null}
       </div>
 
+      {supportsReadableSlug(data.domain) ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Public link: {data.domain}/{data.slug || "mater-dei-gym-energy"}
+        </p>
+      ) : null}
+
       {!isSelfHosted && isDisabled && (
         <div
           className="mt-2 text-sm text-muted-foreground"
@@ -302,7 +316,9 @@ export default function DomainSection({
         </div>
       )}
 
-      {data.domain && data.domain !== "papermark.com" && !isDomainVerified ? (
+      {supportsReadableSlug(data.domain) &&
+      !isAppShareHost(data.domain) &&
+      !isDomainVerified ? (
         <div className="mt-4 text-sm text-red-500">
           Your domain is not verified yet!{" "}
           <Link

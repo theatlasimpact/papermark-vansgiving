@@ -11,7 +11,7 @@ export const sendVerificationRequestEmail = async (params: {
     await sendEmail({
       to: email as string,
       system: true,
-      subject: "Your Papermark Login Link",
+      subject: "Your Atlas Impact login link",
       react: emailTemplate,
       test: process.env.NODE_ENV === "development",
     });

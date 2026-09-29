@@ -1,5 +1,7 @@
 import Head from "next/head";
 
+import { BRAND_NAME, ogImageUrl, viewerDescription, viewerTitle } from "@/lib/brand";
+
 const CustomMetaTag = ({
   enableBranding,
   title,
@@ -15,6 +17,15 @@ const CustomMetaTag = ({
   favicon: string | null;
   url: string | null;
 }) => {
+  const resolvedTitle =
+    (enableBranding && title) || title || viewerTitle();
+  const resolvedDescription =
+    (enableBranding && description) ||
+    description ||
+    viewerDescription();
+  const resolvedImage =
+    (enableBranding && imageUrl) || imageUrl || ogImageUrl(resolvedTitle);
+
   return (
     <Head>
       {/* meta URL */}
@@ -41,39 +52,23 @@ const CustomMetaTag = ({
         </>
       )}
 
-      {/* meta title */}
-      {enableBranding && title && (
-        <>
-          <title>{title}</title>
-          <meta property="og:title" content={title} key="og-title" />
-          <meta name="twitter:title" content={title} key="tw-title" />
-        </>
-      )}
-
-      {/* meta description */}
-      {enableBranding && description && (
-        <>
-          <meta name="description" content={description} key="description" />
-          <meta
-            property="og:description"
-            content={description}
-            key="og-description"
-          />
-          <meta
-            name="twitter:description"
-            content={description}
-            key="tw-description"
-          />
-        </>
-      )}
-
-      {/* meta image */}
-      {enableBranding && imageUrl && (
-        <>
-          <meta property="og:image" content={imageUrl} key="og-image" />
-          <meta name="twitter:image" content={imageUrl} key="tw-image" />
-        </>
-      )}
+      <title>{resolvedTitle}</title>
+      <meta property="og:title" content={resolvedTitle} key="og-title" />
+      <meta name="twitter:title" content={resolvedTitle} key="tw-title" />
+      <meta name="description" content={resolvedDescription} key="description" />
+      <meta
+        property="og:description"
+        content={resolvedDescription}
+        key="og-description"
+      />
+      <meta
+        name="twitter:description"
+        content={resolvedDescription}
+        key="tw-description"
+      />
+      <meta property="og:image" content={resolvedImage} key="og-image" />
+      <meta name="twitter:image" content={resolvedImage} key="tw-image" />
+      <meta property="og:site_name" content={BRAND_NAME} />
     </Head>
   );
 };

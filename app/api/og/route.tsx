@@ -11,18 +11,18 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const title = searchParams.get("title") || "Papermark Document";
+  const title = searchParams.get("title") || "Atlas Impact Solutions";
   const interBoldUrl = new URL('/_static/Inter-Bold.ttf', request.url);
   const Inter = await fetch(interBoldUrl).then((res) => res.arrayBuffer());
 
   return new ImageResponse(
     (
       <div tw="flex flex-col items-center justify-between w-full h-full bg-white text-black p-12">
-        <div tw="text-[32px] flex items-center tracking-tighter">Papermark</div>
-        <div tw="text-[42px] text-center">{title}</div>
-        <div tw="text-[32px] flex items-center">
-          Open-Source Document Sharing
+        <div tw="text-[32px] flex items-center tracking-tighter">
+          Atlas Impact
         </div>
+        <div tw="text-[42px] text-center">{title}</div>
+        <div tw="text-[32px] flex items-center">Atlas Impact Solutions</div>
       </div>
     ),
     {

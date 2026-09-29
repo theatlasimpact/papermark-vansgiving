@@ -8,6 +8,13 @@ import { SessionProvider } from "next-auth/react";
 import PlausibleProvider from "next-plausible";
 import { NuqsAdapter } from "nuqs/adapters/next/pages";
 
+import {
+  appBaseUrl,
+  BRAND_DESCRIPTION,
+  BRAND_LEGAL_NAME,
+  BRAND_NAME,
+  ogImageUrl,
+} from "@/lib/brand";
 import { EXCLUDED_PATHS } from "@/lib/constants";
 
 import { PostHogCustomProvider } from "@/components/providers/posthog-provider";
@@ -27,57 +34,49 @@ export default function App({
   return (
     <>
       <Head>
-        <title>Papermark | The Open Source DocSend Alternative</title>
-        <meta name="theme-color" content="#000000" />
-        <meta
-          name="description"
-          content="Papermark is an open-source document sharing alternative to DocSend with built-in analytics."
-          key="description"
-        />
+        <title>{`${BRAND_NAME} | ${BRAND_LEGAL_NAME}`}</title>
+        <meta name="theme-color" content="#111827" />
+        <meta name="description" content={BRAND_DESCRIPTION} key="description" />
         <meta
           property="og:title"
-          content="Papermark | The Open Source DocSend Alternative"
+          content={`${BRAND_NAME} | ${BRAND_LEGAL_NAME}`}
           key="og-title"
         />
         <meta
           property="og:description"
-          content="Papermark is an open-source document sharing alternative to DocSend with built-in analytics."
+          content={BRAND_DESCRIPTION}
           key="og-description"
         />
         <meta
           property="og:image"
-          content="https://www.papermark.com/_static/meta-image.png"
+          content={ogImageUrl(BRAND_LEGAL_NAME)}
           key="og-image"
         />
-        <meta
-          property="og:url"
-          content="https://www.papermark.com"
-          key="og-url"
-        />
+        <meta property="og:url" content={appBaseUrl()} key="og-url" />
+        <meta property="og:site_name" content={BRAND_NAME} />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@papermarkio" />
-        <meta name="twitter:creator" content="@papermarkio" />
-        <meta name="twitter:title" content="Papermark" key="tw-title" />
+        <meta
+          name="twitter:title"
+          content={`${BRAND_NAME} | ${BRAND_LEGAL_NAME}`}
+          key="tw-title"
+        />
         <meta
           name="twitter:description"
-          content="Papermark is an open-source document sharing alternative to DocSend with built-in analytics."
+          content={BRAND_DESCRIPTION}
           key="tw-description"
         />
         <meta
           name="twitter:image"
-          content="https://www.papermark.com/_static/meta-image.png"
+          content={ogImageUrl(BRAND_LEGAL_NAME)}
           key="tw-image"
         />
-        <link rel="icon" href="/favicon.ico" key="favicon" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" key="favicon" />
       </Head>
       <SessionProvider session={session}>
         <PostHogCustomProvider>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-            <PlausibleProvider
-              domain="papermark.io"
-              enabled={process.env.NEXT_PUBLIC_VERCEL_ENV === "production"}
-            >
+            <PlausibleProvider domain={BRAND_NAME} enabled={false}>
               <NuqsAdapter>
                 <main className={inter.className}>
                   <Toaster closeButton />

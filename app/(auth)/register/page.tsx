@@ -1,41 +1,40 @@
 import { Metadata } from "next";
 
+import { appBaseUrl, BRAND_NAME, ogImageUrl } from "@/lib/brand";
+
 import RegisterClient from "./page-client";
 
-const data = {
-  description: "Signup to Papermark",
-  title: "Sign up | Papermark",
-  url: "/register",
-};
+const title = `Sign up | ${BRAND_NAME}`;
+const description = `Create an ${BRAND_NAME} account`;
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.papermark.com"),
-  title: data.title,
-  description: data.description,
+  metadataBase: new URL(appBaseUrl()),
+  title,
+  description,
   openGraph: {
-    title: data.title,
-    description: data.description,
-    url: data.url,
-    siteName: "Papermark",
-    images: [
-      {
-        url: "/_static/meta-image.png",
-        width: 800,
-        height: 600,
-      },
-    ],
-    locale: "en_US",
-    type: "website",
+    title,
+    description,
+    url: "/register",
+    siteName: BRAND_NAME,
+    images: [{ url: ogImageUrl(title), width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: data.title,
-    description: data.description,
-    creator: "@papermarkio",
-    images: ["/_static/meta-image.png"],
+    title,
+    description,
+    images: [ogImageUrl(title)],
   },
 };
 
 export default function RegisterPage() {
-  return <RegisterClient />;
+  return (
+    <RegisterClient
+      googleEnabled={Boolean(
+        process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+      )}
+      linkedInEnabled={Boolean(
+        process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET,
+      )}
+    />
+  );
 }
